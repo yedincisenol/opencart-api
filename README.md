@@ -46,8 +46,7 @@ Demo Environment
 }
 ``` 
 
-Import collection and environment and select.
-> Important: For try endpoints you must call login endpoints for your version
+> Important: For try endpoints you must call login endpoints for your version first
 
 ## Contributing
 
