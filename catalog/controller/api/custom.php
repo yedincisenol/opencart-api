@@ -2,6 +2,7 @@
 
 include_once 'admin/model/sale/order.php';
 include_once 'admin/model/localisation/tax_rate.php';
+include_once 'catalog/model/account/custom_field.php';
 
 class ControllerApiCustom extends Controller
 {
@@ -13,6 +14,10 @@ class ControllerApiCustom extends Controller
         'meta' => []
     ];
 
+    /**
+     * Authenticate user
+     * @return bool
+     */
     public function auth()
     {
         // load model
@@ -27,6 +32,18 @@ class ControllerApiCustom extends Controller
 
         return true;
 
+    }
+
+    /**
+     * Customers custom fields
+     */
+    public function CustomercustomField()
+    {
+        if ($this->auth())
+        {
+            $customFields = (new ModelAccountCustomField($this->registry))->getCustomFields();
+            $this->setData($customFields);
+        }
     }
 
     /**
@@ -47,15 +64,57 @@ class ControllerApiCustom extends Controller
             $orders =   $this->getOrders($_GET);
             $orders =   $this->paginate($orders);
             $orders =   array_map(function($aorder) use ($order) {
-                $aorder['custom_field'] =   unserialize($order->custom_field);
-                $aorder['payment_custom_field'] =   unserialize($order->payment_custom_field);
+                $aorder['custom_field'] =           unserialize($aorder['custom_field']);
+                $aorder['payment_custom_field'] =   unserialize($aorder['payment_custom_field']);
+                $aorder['customer_custom_field'] =  unserialize($aorder['customer_custom_field']);
                 $aorder['products'] =   $order->getOrderProducts($aorder['order_id']);
-                $aorder['totals']   =   $order->getOrderTotals($aorder['order_id']);
+                $aorder['totals']   =   $this->getOrderTotals($aorder['order_id'], $aorder['shipping_code'], $aorder['payment_country_id']);
                 return $aorder;
             }, $orders);
             $this->setData($orders);
         }
 
+    }
+
+    /**
+     * Ger orders details
+     * @param $order_id
+     * @param $shippingCode
+     * @param $countryID
+     * @return array
+     */
+    private function getOrderTotals($order_id, $shippingCode, $countryID) {
+        $query = $this->db->query("SELECT * FROM " . DB_PREFIX . "order_total
+		  WHERE order_id = '" . (int)$order_id . "' ORDER BY sort_order");
+
+        $totals = array_map(function($row) use ($countryID, $shippingCode) {
+            $code = $row['code'];
+            if ($code == 'shipping')
+                list($code) = explode('.', $shippingCode);
+
+            $row['tax'] = $this->getTotalsTaxRate($code, $countryID);
+            return $row;
+        }, $query->rows);
+
+        return $totals;
+    }
+
+    /**
+     * Calculate tax rates
+     * @param $key
+     * @param $countryID
+     * @return mixed
+     */
+    private function getTotalsTaxRate($key, $countryID)
+    {
+        $DBPREFIX = DB_PREFIX;
+        $query = $this->db->query("select {$DBPREFIX}tax_rate.* from {$DBPREFIX}tax_rate
+              inner join {$DBPREFIX}setting on {$DBPREFIX}setting.`key` = '{$key}_tax_class_id'
+                INNER JOIN {$DBPREFIX}tax_class on {$DBPREFIX}tax_class.tax_class_id = {$DBPREFIX}setting.value
+              INNER JOIN {$DBPREFIX}zone_to_geo_zone on {$DBPREFIX}zone_to_geo_zone.country_id = {$countryID}
+            where {$DBPREFIX}tax_rate.geo_zone_id = {$DBPREFIX}zone_to_geo_zone.geo_zone_id");
+
+        return $query->rows;
     }
 
     /**
@@ -96,7 +155,7 @@ class ControllerApiCustom extends Controller
     private function paginate($results, $page = null, $limit = null)
     {
         if ($page == null) $page = max(@$_GET['page'], 1);
-        if ($limit == null) $limit = isset($_GET['limit']) ?: self::limit;
+        if ($limit == null) $limit = isset($_GET['limit']) ? $_GET['limit'] : self::limit;
 
         $paginate['total']          =   count($results);
         $paginate['current_page']   =   $page;
@@ -110,7 +169,7 @@ class ControllerApiCustom extends Controller
 
     private function getOrders($data = array()) {
 
-        $sql = "SELECT o.*, (SELECT os.name FROM " . DB_PREFIX . "order_status os WHERE os.order_status_id = o.order_status_id AND os.language_id = '" . (int)$this->config->get('config_language_id') . "') AS status, o.shipping_code, o.total, o.currency_code, o.currency_value, o.date_added, o.date_modified FROM `" . DB_PREFIX . "order` o";
+        $sql = "SELECT o.*, (SELECT os.name FROM " . DB_PREFIX . "order_status os WHERE os.order_status_id = o.order_status_id AND os.language_id = '" . (int)$this->config->get('config_language_id') . "') AS status, o.shipping_code, o.total, o.currency_code, o.currency_value, o.date_added, o.date_modified, (SELECT custom_field FROM " . DB_PREFIX . "customer where customer_id = o.customer_id) as customer_custom_field FROM `" . DB_PREFIX . "order` o";
 
         if (isset($data['filter_order_status'])) {
             $implode = array();
@@ -171,18 +230,6 @@ class ControllerApiCustom extends Controller
             $sql .= " ASC";
         }
 
-        if (isset($data['start']) || isset($data['limit'])) {
-            if ($data['start'] < 0) {
-                $data['start'] = 0;
-            }
-
-            if ($data['limit'] < 1) {
-                $data['limit'] = 20;
-            }
-
-            $sql .= " LIMIT " . (int)$data['start'] . "," . (int)$data['limit'];
-        }
-
         $query = $this->db->query($sql);
 
         return $query->rows;
@@ -200,10 +247,14 @@ class ControllerApiCustom extends Controller
             $this->response->addHeader('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
         }
 
+        $this->response->addHeader('X-Opencart-Version: ' . VERSION);
         $this->response->addHeader('Content-Type: application/json');
         $this->response->setOutput(json_encode($this->data));
     }
 
+    /**
+     * Return response 
+     */
     public function __destruct()
     {
         $this->response();
