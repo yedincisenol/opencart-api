@@ -46,7 +46,7 @@ Demo Environment
 }
 ``` 
 
-> Important: For try endpoints you must call login endpoints for your version first
+> Important: For try endpoints you must call first, login endpoints for your version
 
 ## Contributing
 
