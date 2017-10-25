@@ -3,6 +3,7 @@
 include_once 'admin/model/sale/order.php';
 include_once 'admin/model/localisation/tax_rate.php';
 include_once 'catalog/model/account/custom_field.php';
+include_once 'catalog/model/account/customer_group.php';
 
 class ControllerApiCustom extends Controller
 {
@@ -14,14 +15,19 @@ class ControllerApiCustom extends Controller
         'meta' => []
     ];
 
+    public function __construct($registry)
+    {
+        parent::__construct($registry);
+        $this->load->model('catalog/product');
+
+    }
+
     /**
      * Authenticate user
      * @return bool
      */
     public function auth()
     {
-        // load model
-        $this->load->model('catalog/product');
 
         if (!isset($this->session->data['api_id'])) {
             unset($this->data['data'], $this->data['meta']);
@@ -37,13 +43,20 @@ class ControllerApiCustom extends Controller
     /**
      * Customers custom fields
      */
-    public function CustomercustomField()
+    public function customeroption()
     {
         if ($this->auth())
         {
-            $customFields = (new ModelAccountCustomField($this->registry))->getCustomFields();
-            $this->setData($customFields);
+            $data['custom_fields']  =   (new ModelAccountCustomField($this->registry))->getCustomFields();
+            $data['customer_groups']=  $this->getCustomerGroup();
+
+            $this->setData($data);
         }
+    }
+
+    public function getCustomerGroup()
+    {
+        return (new ModelAccountCustomerGroup($this->registry))->getCustomerGroups();
     }
 
     /**
@@ -253,7 +266,7 @@ class ControllerApiCustom extends Controller
     }
 
     /**
-     * Return response 
+     * Return response
      */
     public function __destruct()
     {
