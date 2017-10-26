@@ -4,6 +4,7 @@ include_once 'admin/model/sale/order.php';
 include_once 'admin/model/localisation/tax_rate.php';
 include_once 'catalog/model/account/custom_field.php';
 include_once 'catalog/model/account/customer_group.php';
+include_once 'admin/model/localisation/order_status.php';
 
 class ControllerApiCustom extends Controller
 {
@@ -48,7 +49,8 @@ class ControllerApiCustom extends Controller
         if ($this->auth())
         {
             $data['custom_fields']  =   (new ModelAccountCustomField($this->registry))->getCustomFields();
-            $data['customer_groups']=  $this->getCustomerGroup();
+            $data['customer_groups']=   $this->getCustomerGroup();
+            $data['order_statuses'] =   (new ModelLocalisationOrderStatus($this->registry))->getOrderStatuses();
 
             $this->setData($data);
         }
@@ -211,7 +213,7 @@ class ControllerApiCustom extends Controller
         }
 
         if (!empty($data['filter_date_added'])) {
-            $sql .= " AND DATE(o.date_added) = DATE('" . $this->db->escape($data['filter_date_added']) . "')";
+            $sql .= " AND DATE(o.date_added) >= DATE('" . $this->db->escape($data['filter_date_added']) . "')";
         }
 
         if (!empty($data['filter_date_modified'])) {
