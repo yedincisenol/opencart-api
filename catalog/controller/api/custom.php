@@ -52,7 +52,7 @@ class ControllerApiCustom extends Controller
             $data['customer_groups']=   $this->getCustomerGroup();
             $data['order_statuses'] =   (new ModelLocalisationOrderStatus($this->registry))->getOrderStatuses();
 
-            $this->setData($data);
+            $this->setResponseData($data);
         }
     }
 
@@ -68,7 +68,7 @@ class ControllerApiCustom extends Controller
     {
         if ($this->auth()) {
             $taxes = (new ModelLocalisationTaxRate($this->registry))->getTaxRates();
-            $this->setData($taxes);
+            $this->setResponseData($taxes);
         }
     }
 
@@ -86,7 +86,7 @@ class ControllerApiCustom extends Controller
                 $aorder['totals']   =   $this->getOrderTotals($aorder['order_id'], $aorder['shipping_code'], $aorder['payment_country_id']);
                 return $aorder;
             }, $orders);
-            $this->setData($orders);
+            $this->setResponseData($orders);
         }
 
     }
@@ -128,7 +128,7 @@ class ControllerApiCustom extends Controller
                 INNER JOIN {$DBPREFIX}tax_class on {$DBPREFIX}tax_class.tax_class_id = {$DBPREFIX}setting.value
               INNER JOIN {$DBPREFIX}zone_to_geo_zone on {$DBPREFIX}zone_to_geo_zone.country_id = {$countryID}
               left JOIN {$DBPREFIX}tax_rule on {$DBPREFIX}tax_rule.tax_class_id =  {$DBPREFIX}tax_class.tax_class_id
-            where {$DBPREFIX}tax_rate.geo_zone_id = {$DBPREFIX}zone_to_geo_zone.geo_zone_id and {$DBPREFIX}tax_rule.tax_rate_id = {$DBPREFIX}tax_rate.tax_rate_id");
+            where {$DBPREFIX}tax_rate.geo_zone_id = {$DBPREFIX}zone_to_geo_zone.geo_zone_id and {$DBPREFIX}tax_rule.tax_rate_id = tax_rate.tax_rate_id");
 
         return $query->rows;
     }
@@ -148,7 +148,7 @@ class ControllerApiCustom extends Controller
                 return $data;
             }, $products);
             //Customize end
-            $this->setData($products);
+            $this->setResponseData($products);
         }
     }
 
@@ -156,7 +156,7 @@ class ControllerApiCustom extends Controller
      * Add data to response
      * @param $data
      */
-    private function setData($data)
+    private function setResponseData($data)
     {
         $this->data['data'] = $data;
     }
