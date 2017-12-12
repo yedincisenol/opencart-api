@@ -144,11 +144,11 @@ class ControllerApiCustom extends Controller
 
         if ($error !== '') {
             // throw the Exception or exit // or whatever :)
-            exit($error);
+            return false;
         }
 
         // everything is OK
-        return $result;
+        return true;
     }
 
     /**
