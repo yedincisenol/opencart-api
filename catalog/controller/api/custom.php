@@ -188,7 +188,8 @@ class ControllerApiCustom extends Controller
                 INNER JOIN {$DBPREFIX}tax_class on {$DBPREFIX}tax_class.tax_class_id = {$DBPREFIX}setting.value
               INNER JOIN {$DBPREFIX}zone_to_geo_zone on {$DBPREFIX}zone_to_geo_zone.country_id = {$countryID}
               left JOIN {$DBPREFIX}tax_rule on {$DBPREFIX}tax_rule.tax_class_id =  {$DBPREFIX}tax_class.tax_class_id
-            where {$DBPREFIX}tax_rate.geo_zone_id = {$DBPREFIX}zone_to_geo_zone.geo_zone_id and {$DBPREFIX}tax_rule.tax_rate_id = {$DBPREFIX}tax_rate.tax_rate_id");
+            where {$DBPREFIX}tax_rate.geo_zone_id = {$DBPREFIX}zone_to_geo_zone.geo_zone_id and {$DBPREFIX}tax_rule.tax_rate_id = {$DBPREFIX}tax_rate.tax_rate_id
+            group by {$DBPREFIX}tax_rate.tax_rate_id");
 
         return $query->rows;
     }
