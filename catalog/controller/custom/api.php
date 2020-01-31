@@ -50,9 +50,10 @@ class Controllercustomapi extends Controller
         $username = $data['username'];
         $key      = $data['key'];
 
-        $query = $this->db->query(
-            "SELECT * FROM ".DB_PREFIX."api WHERE status = 1 and `".$this->dbColumnName."`='".$username."' and `key`='".$key."'"
-        );
+        $sqlFormat = "SELECT * FROM %sapi WHERE status = 1 and `%s`='%s' and `key`='%s'";
+        $sql = sprintf($sqlFormat, DB_PREFIX, $this->dbColumnName, $username, $key);
+
+        $query = $this->db->query($sql);
 
         if (isset($query->row) && isset($query->row['api_id'])) {
             return true;
@@ -109,9 +110,10 @@ class Controllercustomapi extends Controller
         $username = $this->request->post['username'];
         $key      = $this->request->post['key'];
 
-        $query = $this->db->query(
-            "SELECT * FROM ".DB_PREFIX."api WHERE status = 1 and `".$this->dbColumnName."`='".$username."' and `key`='".$key."'"
-        );
+        $sqlFormat = "SELECT * FROM %sapi WHERE status = 1 and `%s`='%s' and `key`='%s'";
+        $sql = sprintf($sqlFormat, DB_PREFIX, $this->dbColumnName, $username, $key);
+
+        $query = $this->db->query($sql);
 
         $row = $query->row;
         if (!isset($row[$this->dbColumnName]) || !isset($row['key'])) {
