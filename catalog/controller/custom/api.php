@@ -42,9 +42,11 @@ class Controllercustomapi extends Controller
         }
 
         $token = $this->request->get['token'];
-        $data  = $this->tryParseToken($token);
-        if (!$data) {
-            return $this->error();
+
+        try {
+            $data = $this->tryParseToken($token);
+        } catch (Exception $e) {
+            return $this->error($e->getMessage());
         }
 
         $username = $data['username'];
@@ -67,28 +69,24 @@ class Controllercustomapi extends Controller
      * @param $token
      *
      * @return bool|array
+     * @throws Exception
      */
     private function tryParseToken($token)
     {
         $encodedJson = base64_decode($token);
-        if ($encodedJson) {
-            try {
-                $decodedJson = json_decode($encodedJson, true);
-                if (!isset($decodedJson['username'])) {
-                    throw new Exception('username not found');
-                }
-
-                if (!isset($decodedJson['key'])) {
-                    throw new Exception('key not found');
-                }
-
-                return $decodedJson;
-            } catch (Exception $e) {
-                return false;
-            }
+        if (!$encodedJson) {
+            throw new Exception('token can not decoded');
         }
 
-        return false;
+        $decodedJson = json_decode($encodedJson, true);
+        if (!isset($decodedJson['username'])) {
+            throw new Exception('username not found');
+        }
+
+        if (!isset($decodedJson['key'])) {
+            throw new Exception('key not found');
+        }
+        return $decodedJson;
     }
 
 
