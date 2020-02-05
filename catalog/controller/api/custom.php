@@ -6,144 +6,39 @@ include_once 'catalog/model/account/custom_field.php';
 include_once 'catalog/model/account/customer_group.php';
 include_once 'admin/model/localisation/order_status.php';
 
-class Controllercustomapi extends Controller
+class ControllerApiCustom extends Controller
 {
 
     const limit = 15;
 
-    private $dbColumnName = 'username';
-
-    private $data         = [
+    private $data = [
         'data' => [],
         'meta' => []
     ];
-
 
     public function __construct($registry)
     {
         parent::__construct($registry);
         $this->load->model('catalog/product');
 
-        if ($this->startsWith(VERSION, '2.')) {
-            $this->dbColumnName = 'name';
-        }
     }
-
 
     /**
      * Authenticate user
-     *
      * @return bool
      */
     public function auth()
     {
-        if (!isset($this->request->get['token'])) {
-            return $this->error();
+
+        if (!isset($this->session->data['api_id'])) {
+            unset($this->data['data'], $this->data['meta']);
+            $this->data['message'] = $this->language->get('error_permission');
+
+            return false;
         }
 
-        $token = $this->request->get['token'];
+        return true;
 
-        try {
-            $data = $this->tryParseToken($token);
-        } catch (Exception $e) {
-            return $this->error($e->getMessage());
-        }
-
-        $username = $data['username'];
-        $key      = $data['key'];
-
-        $sqlFormat = "SELECT * FROM %sapi WHERE status = 1 and `%s`='%s' and `key`='%s'";
-        $sql = sprintf($sqlFormat, DB_PREFIX, $this->dbColumnName, $username, $key);
-
-        $query = $this->db->query($sql);
-
-        if (isset($query->row) && isset($query->row['api_id'])) {
-            return true;
-        }
-
-        return $this->error();
-    }
-
-
-    /**
-     * @param $token
-     *
-     * @return bool|array
-     * @throws Exception
-     */
-    private function tryParseToken($token)
-    {
-        $encodedJson = base64_decode($token);
-        if (!$encodedJson) {
-            throw new Exception('token can not decoded');
-        }
-
-        $decodedJson = json_decode($encodedJson, true);
-        if (!isset($decodedJson['username'])) {
-            throw new Exception('username not found');
-        }
-
-        if (!isset($decodedJson['key'])) {
-            throw new Exception('key not found');
-        }
-        return $decodedJson;
-    }
-
-
-    /**
-     * @return bool|void
-     */
-    public function login()
-    {
-        $json = [];
-
-        if (!isset($this->request->post['username'])) {
-            return $this->error('username not found');
-        }
-
-        if (!isset($this->request->post['key'])) {
-            return $this->error('key not found');
-        }
-
-        $username = $this->request->post['username'];
-        $key      = $this->request->post['key'];
-
-        $sqlFormat = "SELECT * FROM %sapi WHERE status = 1 and `%s`='%s' and `key`='%s'";
-        $sql = sprintf($sqlFormat, DB_PREFIX, $this->dbColumnName, $username, $key);
-
-        $query = $this->db->query($sql);
-
-        $row = $query->row;
-        if (!isset($row[$this->dbColumnName]) || !isset($row['key'])) {
-            return $this->error();
-        }
-
-        $username = $row[$this->dbColumnName];
-        $key      = $row['key'];
-
-        $json['success'] = $this->language->get('text_success');
-        $json['token']   = base64_encode(json_encode(['username' => $username, 'key' => $key]));
-        unset($this->data['data'], $this->data['meta']);
-
-        $this->data = $json;
-    }
-
-
-    /**
-     * @param  null  $msg
-     *
-     * @return bool
-     */
-    private function error($msg = null)
-    {
-        if (!$msg) {
-            $msg = $this->language->get('error_permission');
-        }
-
-        unset($this->data['data'], $this->data['meta']);
-        $this->data['message'] = $msg;
-
-        return false;
     }
 
     /**
@@ -177,10 +72,6 @@ class Controllercustomapi extends Controller
         }
     }
 
-
-    /**
-     * Order List
-     */
     public function order()
     {
         if ($this->auth()) {
@@ -262,11 +153,9 @@ class Controllercustomapi extends Controller
 
     /**
      * Ger orders details
-     *
      * @param $order_id
      * @param $shippingCode
      * @param $countryID
-     *
      * @return array
      */
     private function getOrderTotals($order_id, $shippingCode, $countryID) {
@@ -326,7 +215,6 @@ class Controllercustomapi extends Controller
 
     /**
      * Add data to response
-     *
      * @param $data
      */
     private function setResponseData($data)
@@ -336,11 +224,9 @@ class Controllercustomapi extends Controller
 
     /**
      * Paginate result set
-     *
      * @param $results
-     * @param  null  $page
-     * @param  null  $limit
-     *
+     * @param null $page
+     * @param null $limit
      * @return array
      */
     private function paginate($results, $page = null, $limit = null)
@@ -425,21 +311,6 @@ class Controllercustomapi extends Controller
 
         return $query->rows;
     }
-
-
-    /**
-     * @param $string
-     * @param $startString
-     *
-     * @return bool
-     */
-    function startsWith($string, $startString)
-    {
-        $len = strlen($startString);
-
-        return (substr($string, 0, $len) === $startString);
-    }
-
 
     /**
      * Echo response
