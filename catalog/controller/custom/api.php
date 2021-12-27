@@ -51,7 +51,7 @@ class Controllercustomapi extends Controller
         }
 
         $username = $data['username'];
-        $key      = $data['key'];
+        $key = $data['key'];
 
         $sqlFormat = "SELECT * FROM %sapi WHERE status = 1 and `%s`='%s' and `key`='%s'";
         $sql = sprintf($sqlFormat, DB_PREFIX, $this->dbColumnName, $username, $key);
@@ -107,7 +107,7 @@ class Controllercustomapi extends Controller
         }
 
         $username = $this->request->post['username'];
-        $key      = $this->request->post['key'];
+        $key = $this->request->post['key'];
 
         $sqlFormat = "SELECT * FROM %sapi WHERE status = 1 and `%s`='%s' and `key`='%s'";
         $sql = sprintf($sqlFormat, DB_PREFIX, $this->dbColumnName, $username, $key);
@@ -120,10 +120,10 @@ class Controllercustomapi extends Controller
         }
 
         $username = $row[$this->dbColumnName];
-        $key      = $row['key'];
+        $key = $row['key'];
 
         $json['success'] = $this->language->get('text_success');
-        $json['token']   = base64_encode(json_encode(['username' => $username, 'key' => $key]));
+        $json['token'] = base64_encode(json_encode(['username' => $username, 'key' => $key]));
         unset($this->data['data'], $this->data['meta']);
 
         $this->data = $json;
@@ -131,7 +131,7 @@ class Controllercustomapi extends Controller
 
 
     /**
-     * @param  null  $msg
+     * @param null $msg
      *
      * @return bool
      */
@@ -152,11 +152,10 @@ class Controllercustomapi extends Controller
      */
     public function customeroption()
     {
-        if ($this->auth())
-        {
-            $data['custom_fields']  =   (new ModelAccountCustomField($this->registry))->getCustomFields();
-            $data['customer_groups']=   $this->getCustomerGroup();
-            $data['order_statuses'] =   (new ModelLocalisationOrderStatus($this->registry))->getOrderStatuses();
+        if ($this->auth()) {
+            $data['custom_fields'] = (new ModelAccountCustomField($this->registry))->getCustomFields();
+            $data['customer_groups'] = $this->getCustomerGroup();
+            $data['order_statuses'] = (new ModelLocalisationOrderStatus($this->registry))->getOrderStatuses();
 
             $this->setResponseData($data);
         }
@@ -185,15 +184,15 @@ class Controllercustomapi extends Controller
     public function order()
     {
         if ($this->auth()) {
-            $order  =   new ModelSaleOrder($this->registry);
-            $orders =   $this->getOrders($_GET);
-            $orders =   $this->paginate($orders);
-            $orders =   array_map(function($aorder) use ($order) {
-                $aorder['custom_field'] =           $this->decode($aorder['custom_field']);
-                $aorder['payment_custom_field'] =   $this->decode($aorder['payment_custom_field']);
-                $aorder['customer_custom_field'] =  $this->decode($aorder['customer_custom_field']);
-                $aorder['products'] =   $order->getOrderProducts($aorder['order_id']);
-                $aorder['totals']   =   $this->getOrderTotals($aorder['order_id'], $aorder['shipping_code'], $aorder['payment_country_id']);
+            $order = new ModelSaleOrder($this->registry);
+            $orders = $this->getOrders($_GET);
+            $orders = $this->paginate($orders);
+            $orders = array_map(function ($aorder) use ($order) {
+                $aorder['custom_field'] = $this->decode($aorder['custom_field']);
+                $aorder['payment_custom_field'] = $this->decode($aorder['payment_custom_field']);
+                $aorder['customer_custom_field'] = $this->decode($aorder['customer_custom_field']);
+                $aorder['products'] = $order->getOrderProducts($aorder['order_id']);
+                $aorder['totals'] = $this->getOrderTotals($aorder['order_id'], $aorder['shipping_code'], $aorder['payment_country_id']);
                 return $aorder;
             }, $orders);
             $this->setResponseData($orders);
@@ -206,9 +205,8 @@ class Controllercustomapi extends Controller
     public function category()
     {
         if ($this->auth()) {
-            $model  =   new ModelCatalogCategory($this->registry);
-            $categories =   $model->getCategories($_GET['parent_id'] ?? null);
-            $categories =   $this->paginate($categories);
+            $query = $this->db->query('SELECT * FROM ' . DB_PREFIX . 'category c LEFT JOIN ' . DB_PREFIX . 'category_description cd ON (c.category_id = cd.category_id) LEFT JOIN ' . DB_PREFIX . "category_to_store c2s ON (c.category_id = c2s.category_id) WHERE cd.language_id = '" . (int)$this->config->get('config_language_id') . "' AND c2s.store_id = '" . (int)$this->config->get('config_store_id') . "'  AND c.status = '1' ORDER BY c.sort_order, LCASE(cd.name)");
+            $categories = $this->paginate($query->rows);
             $this->setResponseData($categories);
         }
     }
@@ -282,11 +280,12 @@ class Controllercustomapi extends Controller
      *
      * @return array
      */
-    private function getOrderTotals($order_id, $shippingCode, $countryID) {
-        $query = $this->db->query("SELECT * FROM " . DB_PREFIX . "order_total
+    private function getOrderTotals($order_id, $shippingCode, $countryID)
+    {
+        $query = $this->db->query('SELECT * FROM ' . DB_PREFIX . "order_total
 		  WHERE order_id = '" . (int)$order_id . "' ORDER BY sort_order");
 
-        $totals = array_map(function($row) use ($countryID, $shippingCode) {
+        $totals = array_map(function ($row) use ($countryID, $shippingCode) {
             $code = $row['code'];
             if ($code == 'shipping')
                 list($code) = explode('.', $shippingCode);
@@ -351,8 +350,8 @@ class Controllercustomapi extends Controller
      * Paginate result set
      *
      * @param $results
-     * @param  null  $page
-     * @param  null  $limit
+     * @param null $page
+     * @param null $limit
      *
      * @return array
      */
@@ -361,19 +360,20 @@ class Controllercustomapi extends Controller
         if ($page == null) $page = max(@$_GET['page'], 1);
         if ($limit == null) $limit = isset($_GET['limit']) ? $_GET['limit'] : self::limit;
 
-        $paginate['total']          =   count($results);
-        $paginate['current_page']   =   $page;
-        $paginate['per_page']       =   $limit;
-        $paginate['total_pages']    =   ceil(count($results) / $limit);
+        $paginate['total'] = count($results);
+        $paginate['current_page'] = $page;
+        $paginate['per_page'] = $limit;
+        $paginate['total_pages'] = ceil(count($results) / $limit);
 
         $this->data['meta']['pagination'] = $paginate;
 
         return array_slice($results, ($page - 1) * $limit, $limit);
     }
 
-    private function getOrders($data = array()) {
+    private function getOrders($data = array())
+    {
 
-        $sql = "SELECT o.*, (SELECT os.name FROM " . DB_PREFIX . "order_status os WHERE os.order_status_id = o.order_status_id AND os.language_id = '" . (int)$this->config->get('config_language_id') . "') AS status, o.shipping_code, o.total, o.currency_code, o.currency_value, o.date_added, o.date_modified, (SELECT custom_field FROM " . DB_PREFIX . "customer where customer_id = o.customer_id) as customer_custom_field FROM `" . DB_PREFIX . "order` o";
+        $sql = 'SELECT o.*, (SELECT os.name FROM ' . DB_PREFIX . "order_status os WHERE os.order_status_id = o.order_status_id AND os.language_id = '" . (int)$this->config->get('config_language_id') . "') AS status, o.shipping_code, o.total, o.currency_code, o.currency_value, o.date_added, o.date_modified, (SELECT custom_field FROM " . DB_PREFIX . 'customer where customer_id = o.customer_id) as customer_custom_field FROM `' . DB_PREFIX . 'order` o';
 
         if (isset($data['filter_order_status'])) {
             $implode = array();
@@ -385,7 +385,7 @@ class Controllercustomapi extends Controller
             }
 
             if ($implode) {
-                $sql .= " WHERE (" . implode(" OR ", $implode) . ")";
+                $sql .= ' WHERE (' . implode(' OR ', $implode) . ')';
             } else {
 
             }
@@ -423,15 +423,15 @@ class Controllercustomapi extends Controller
         );
 
         if (isset($data['sort']) && in_array($data['sort'], $sort_data)) {
-            $sql .= " ORDER BY " . $data['sort'];
+            $sql .= ' ORDER BY ' . $data['sort'];
         } else {
-            $sql .= " ORDER BY o.order_id";
+            $sql .= ' ORDER BY o.order_id';
         }
 
         if (isset($data['order']) && ($data['order'] == 'DESC')) {
-            $sql .= " DESC";
+            $sql .= ' DESC';
         } else {
-            $sql .= " ASC";
+            $sql .= ' ASC';
         }
 
         $query = $this->db->query($sql);
