@@ -1,6 +1,7 @@
 <?php
 
 include_once 'admin/model/sale/order.php';
+include_once 'catalog/model/catalog/category.php';
 include_once 'admin/model/localisation/tax_rate.php';
 include_once 'catalog/model/account/custom_field.php';
 include_once 'catalog/model/account/customer_group.php';
@@ -13,7 +14,7 @@ class Controllercustomapi extends Controller
 
     private $dbColumnName = 'username';
 
-    private $data         = [
+    private $data = [
         'data' => [],
         'meta' => []
     ];
@@ -197,7 +198,19 @@ class Controllercustomapi extends Controller
             }, $orders);
             $this->setResponseData($orders);
         }
+    }
 
+    /**
+     * Category List
+     */
+    public function category()
+    {
+        if ($this->auth()) {
+            $model  =   new ModelCatalogCategory($this->registry);
+            $categories =   $model->getCategories($_GET['parent_id'] ?? null);
+            $categories =   $this->paginate($categories);
+            $this->setResponseData($categories);
+        }
     }
 
     private function decode($string)
