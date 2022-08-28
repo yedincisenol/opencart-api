@@ -323,15 +323,21 @@ class Controllercustomapi extends Controller
     public function product()
     {
         if ($this->auth()) {
+		$page = (int) $_GET['page'] ?? 1;
+            $limit = (int) ($_GET['limit'] ?? self::limit);
+            $start = ($page - 1) * $limit;
+
+            $DBPREFIX = DB_PREFIX;
+            $languageId = $this->config->get('config_language_id');
             // get products
-            $products = $this->model_catalog_product->getProducts();
-            $products = $this->paginate($products);
-            //Costoomize start
-            $products = array_map(function ($data) {
-                unset($data['description']);
-                return $data;
-            }, $products);
-            //Customize end
+            $query = $this->db->query(
+                "SELECT p.product_id, p.quantity, p.price, pd.name, p.sku, p.model from {$DBPREFIX}product as p
+                        inner join {$DBPREFIX}product_description as pd on pd.product_id = p.product_id and pd.language_id = $languageId
+                        where p.status = 1
+                        order by pd.name, p.model, p.price, p.quantity, p.status, p.sort_order
+                        limit $start, $limit"
+            );
+            $products = $query->rows;
             $this->setResponseData($products);
         }
     }
