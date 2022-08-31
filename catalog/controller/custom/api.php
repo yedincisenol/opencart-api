@@ -6,6 +6,7 @@ include_once 'admin/model/localisation/tax_rate.php';
 include_once 'catalog/model/account/custom_field.php';
 include_once 'catalog/model/account/customer_group.php';
 include_once 'admin/model/localisation/order_status.php';
+include_once 'catalog/model/checkout/order.php';
 
 class Controllercustomapi extends Controller
 {
@@ -483,5 +484,12 @@ class Controllercustomapi extends Controller
     public function __destruct()
     {
         $this->response();
+    }
+
+    public function orderStatusUpdate()
+    {
+        $orderId = $this->request->post['order_id'];
+        $orderStatusId = $this->request->post['order_status_id'];
+        (new ModelCheckoutOrder($this->registry))->addOrderHistory($orderId, $orderStatusId);
     }
 }
