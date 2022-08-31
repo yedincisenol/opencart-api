@@ -486,10 +486,11 @@ class Controllercustomapi extends Controller
         $this->response();
     }
 
-    public function orderStatusUpdate()
+    public function orderStatus()
     {
-        $orderId = $this->request->post['order_id'];
-        $orderStatusId = $this->request->post['order_status_id'];
+        $request = json_decode(file_get_contents('php://input'), true);
+        $orderId = $request['order_id'];
+        $orderStatusId = $request['order_status_id'];
         (new ModelCheckoutOrder($this->registry))->addOrderHistory($orderId, $orderStatusId);
     }
 }
