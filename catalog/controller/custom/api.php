@@ -324,8 +324,8 @@ class Controllercustomapi extends Controller
     public function product()
     {
         if ($this->auth()) {
-            $page = isset($_GET[‘page’]) ? $_GET[‘page’] : 1;
-            $limit = isset($_GET[‘limit’]) ? (int) $_GET[‘limit’] : self::limit;
+            $page = isset($_GET['page']) ? $_GET['page'] : 1;
+            $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : self::limit;
             $start = ($page - 1) * $limit;
 
             $DBPREFIX = DB_PREFIX;
