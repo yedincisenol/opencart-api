@@ -475,7 +475,9 @@ class Controllercustomapi extends Controller
 
         $this->response->addHeader('X-Opencart-Version: ' . VERSION);
         $this->response->addHeader('Content-Type: application/json');
-        $this->response->setOutput(json_encode($this->data));
+        if(!$this->response->getOutput()) {
+            $this->response->setOutput(json_encode($this->data));	        	    
+        }
     }
 
     /**
