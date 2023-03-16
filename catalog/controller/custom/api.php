@@ -516,8 +516,8 @@ class Controllercustomapi extends Controller
             $sql = "SELECT * FROM " . DB_PREFIX . "manufacturer m LEFT JOIN " . DB_PREFIX . "manufacturer_to_store m2s ON (m.manufacturer_id = m2s.manufacturer_id) WHERE m2s.store_id = '" . (int)$this->config->get('config_store_id') . "' ORDER BY name ASC";
 
             $query = $this->db->query($sql);
-            $categories = $this->paginate($query->rows);
-            $this->setResponseData($categories);
+            $manufacturers = $this->paginate($query->rows);
+            $this->setResponseData($manufacturers);
         }
     }
 }
