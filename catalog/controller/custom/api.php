@@ -505,4 +505,19 @@ class Controllercustomapi extends Controller
         $orderStatusId = $request['order_status_id'];
         (new ModelCheckoutOrder($this->registry))->addOrderHistory($orderId, $orderStatusId);
     }
+
+    /**
+     * Manufacturer List
+     */
+    public function manufacturer()
+    {
+        if ($this->auth()) {
+
+            $sql = "SELECT * FROM " . DB_PREFIX . "manufacturer m LEFT JOIN " . DB_PREFIX . "manufacturer_to_store m2s ON (m.manufacturer_id = m2s.manufacturer_id) WHERE m2s.store_id = '" . (int)$this->config->get('config_store_id') . "' ORDER BY name ASC";
+
+            $query = $this->db->query($sql);
+            $manufacturers = $this->paginate($query->rows);
+            $this->setResponseData($manufacturers);
+        }
+    }
 }
