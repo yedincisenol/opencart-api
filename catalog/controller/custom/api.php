@@ -342,11 +342,18 @@ class Controllercustomapi extends Controller
             $languageId = $this->config->get('config_language_id');
             // get products
             $query = $this->db->query(
-                "SELECT p.product_id, p.quantity, p.price, pd.name, p.sku, p.model from {$DBPREFIX}product as p
-                        inner join {$DBPREFIX}product_description as pd on pd.product_id = p.product_id and pd.language_id = $languageId
-                        where p.status = 1
-                        order by pd.name, p.model, p.price, p.quantity, p.status, p.sort_order
-                        limit $start, $limit"
+                "SELECT
+                     pd.*, p.*,  m.name AS manufacturer, wcd.unit as weight_unit, cd.name as category_name, cd.category_id as category_id
+                from {$DBPREFIX}product as p
+                    inner join {$DBPREFIX}product_description as pd on pd.product_id = p.product_id and pd.language_id = $languageId
+                    LEFT JOIN {$DBPREFIX}manufacturer m ON (p.manufacturer_id = m.manufacturer_id)
+                    LEFT JOIN {$DBPREFIX}weight_class wc on (p.weight_class_id = wc.weight_class_id)
+                    LEFT JOIN {$DBPREFIX}weight_class_description wcd on (wc.weight_class_id = wcd.weight_class_id)
+                    LEFT JOIN oc_product_to_category ptc on p.product_id = ptc.product_id
+                    LEFT JOIN oc_category_description cd ON (ptc.category_id = cd.category_id)
+                where p.status = 1
+                group by p.product_id
+                limit $start, $limit"
             );
             $products = $query->rows;
             $this->setResponseData($products);
