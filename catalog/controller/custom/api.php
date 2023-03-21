@@ -527,4 +527,19 @@ class Controllercustomapi extends Controller
             $this->setResponseData($manufacturers);
         }
     }
+    /**
+     * lengthCLass List
+     */
+    public function lengthCLass()
+    {
+        if ($this->auth()) {
+
+            $sql = "select lc.length_class_id as id, lcd.title, lcd.unit from " . DB_PREFIX . "length_class lc
+                left join " . DB_PREFIX . "length_class_description lcd on lc.length_class_id = lcd.length_class_id
+            Where lcd.language_id = " . (int)$this->config->get('config_language_id');
+
+            $query = $this->db->query($sql);
+            $this->setResponseData($query->rows);
+        }
+    }
 }
