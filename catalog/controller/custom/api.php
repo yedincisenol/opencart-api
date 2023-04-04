@@ -543,6 +543,22 @@ class Controllercustomapi extends Controller
     }
 
     /**
+     * weightClass List
+     */
+    public function weightClass()
+    {
+        if ($this->auth()) {
+
+            $sql = "select wd.unit, wd.title, w.weight_class_id from " . DB_PREFIX . "weight_class w
+                left join " . DB_PREFIX . "weight_class_description wd on w.weight_class_id = wd.weight_class_id
+            Where wd.language_id = " . (int)$this->config->get('config_language_id');
+
+            $query = $this->db->query($sql);
+            $this->setResponseData($query->rows);
+        }
+    }
+
+    /**
      * Product Create
      */
     public function createProduct()
