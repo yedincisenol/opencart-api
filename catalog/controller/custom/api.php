@@ -10,7 +10,6 @@ include_once 'catalog/model/checkout/order.php';
 
 class Controllercustomapi extends Controller
 {
-
     const limit = 15;
 
     private $dbColumnName = 'username';
@@ -19,7 +18,6 @@ class Controllercustomapi extends Controller
         'data' => [],
         'meta' => []
     ];
-
 
     public function __construct($registry)
     {
@@ -30,7 +28,6 @@ class Controllercustomapi extends Controller
             $this->dbColumnName = 'name';
         }
     }
-
 
     /**
      * Authenticate user
@@ -66,7 +63,6 @@ class Controllercustomapi extends Controller
         return $this->error();
     }
 
-
     /**
      * @param $token
      *
@@ -90,7 +86,6 @@ class Controllercustomapi extends Controller
         }
         return $decodedJson;
     }
-
 
     /**
      * @return bool|void
@@ -129,7 +124,6 @@ class Controllercustomapi extends Controller
 
         $this->data = $json;
     }
-
 
     /**
      * @param null $msg
@@ -177,7 +171,6 @@ class Controllercustomapi extends Controller
             $this->setResponseData($taxes);
         }
     }
-
 
     /**
      * Order List
@@ -334,6 +327,10 @@ class Controllercustomapi extends Controller
     public function product()
     {
         if ($this->auth()) {
+
+            if(isset($_GET['product_id'])) {
+                return $this->getProduct($_GET['product_id']);
+            }
             $page = isset($_GET['page']) ? $_GET['page'] : 1;
             $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : self::limit;
             $start = ($page - 1) * $limit;
@@ -394,16 +391,16 @@ class Controllercustomapi extends Controller
         return array_slice($results, ($page - 1) * $limit, $limit);
     }
 
+    /**
+     * Order List
+     */
     private function getOrders($data = array())
     {
-
         $sql = 'SELECT o.*, (SELECT os.name FROM ' . DB_PREFIX . "order_status os WHERE os.order_status_id = o.order_status_id AND os.language_id = '" . (int)$this->config->get('config_language_id') . "') AS status, o.shipping_code, o.total, o.currency_code, o.currency_value, o.date_added, o.date_modified, (SELECT custom_field FROM " . DB_PREFIX . 'customer where customer_id = o.customer_id) as customer_custom_field FROM `' . DB_PREFIX . 'order` o';
 
         if (isset($data['filter_order_status'])) {
             $implode = array();
-
             $order_statuses = explode(',', $data['filter_order_status']);
-
             foreach ($order_statuses as $order_status_id) {
                 $implode[] = "o.order_status_id = '" . (int)$order_status_id . "'";
             }
@@ -463,7 +460,6 @@ class Controllercustomapi extends Controller
         return $query->rows;
     }
 
-
     /**
      * @param $string
      * @param $startString
@@ -476,7 +472,6 @@ class Controllercustomapi extends Controller
 
         return (substr($string, 0, $len) === $startString);
     }
-
 
     /**
      * Echo response
@@ -493,7 +488,7 @@ class Controllercustomapi extends Controller
         $this->response->addHeader('X-Opencart-Version: ' . VERSION);
         $this->response->addHeader('Content-Type: application/json');
         if(!$this->response->getOutput()) {
-            $this->response->setOutput(json_encode($this->data));	        	    
+            $this->response->setOutput(json_encode($this->data));
         }
     }
 
@@ -505,6 +500,9 @@ class Controllercustomapi extends Controller
         $this->response();
     }
 
+    /**
+     * Order Status
+     */
     public function orderStatus()
     {
         $request = json_decode(file_get_contents('php://input'), true);
@@ -527,6 +525,7 @@ class Controllercustomapi extends Controller
             $this->setResponseData($manufacturers);
         }
     }
+
     /**
      * lengthCLass List
      */
@@ -541,5 +540,159 @@ class Controllercustomapi extends Controller
             $query = $this->db->query($sql);
             $this->setResponseData($query->rows);
         }
+    }
+
+    /**
+     * Product Create
+     */
+    public function createProduct()
+    {
+        if (!$this->auth()) {
+            return false;
+        }
+
+        $data = $this->request->post;
+        $this->db->query(
+            "INSERT INTO " . DB_PREFIX . "product SET model = '" . $this->db->escape($data['model']) .
+            "', sku = '" . $this->db->escape($data['sku'])  .
+            "', quantity = '" . (int)$data['quantity'] .
+            "', manufacturer_id = '" . (int)$data['manufacturer_id'] .
+            "', price = '" . (float)$data['price'] .
+            "', weight = '" . (float)$data['weight'] .
+            "', weight_class_id = '" . (int)$data['weight_class_id'] .
+            "', length = '" . (float)$data['length'] .
+            "', width = '" . (float)$data['width'] .
+            "', height = '" . (float)$data['height'] .
+            "', length_class_id = '" . (int)$data['length_class_id'] .
+            "', status = '" . (int)$data['status'] .
+            "', image = '" . $this->imageUpload($data['image'], $data['model']) .
+            "', tax_class_id = '" . (int)$data['tax_class_id'] .
+            "', date_added = NOW(), date_modified = NOW()"
+        );
+
+        $productId = $this->db->getLastId();
+        $this->db->query("INSERT INTO " . DB_PREFIX . "product_to_store SET product_id = '" . (int)$productId .
+            "', store_id = '" . (int)$this->config->get('config_store_id') . "'");
+
+        $this->db->query("INSERT INTO " . DB_PREFIX . "product_description SET product_id = '" . (int)$productId .
+            "', language_id = '" . (int)$this->config->get('config_language_id') .
+            "', name = '" . $this->db->escape($data['name']) .
+            "', description = '" . $this->db->escape($data['description']) .
+            "', tag = '" . $this->db->escape($data['tag']) .
+            "', meta_title = '" . $this->db->escape($data['meta_title']) .
+            "', meta_description = '" . $this->db->escape($data['meta_description']) .
+            "', meta_keyword = '" . $this->db->escape($data['meta_keyword']) . "'");
+
+        $this->db->query("INSERT INTO " . DB_PREFIX . "product_to_category SET product_id = '" . (int)$productId .
+            "', category_id = '" . $data['category_id'] . "'");
+
+    }
+
+    /**
+     * Product Update
+     */
+    public function UpdateProduct()
+    {
+        if (!$this->auth()) {
+            return false;
+        }
+
+        $productId = $_GET['product_id'];
+        $data = $this->request->post;
+        $this->db->query(
+            "UPDATE " . DB_PREFIX . "product SET model = '" . $this->db->escape($data['model']) .
+            "', sku = '" . $this->db->escape($data['sku'])  .
+            "', quantity = '" . (int)$data['quantity'] .
+            "', manufacturer_id = '" . (int)$data['manufacturer_id'] .
+            "', price = '" . (float)$data['price'] .
+            "', weight = '" . (float)$data['weight'] .
+            "', weight_class_id = '" . (int)$data['weight_class_id'] .
+            "', length = '" . (float)$data['length'] .
+            "', width = '" . (float)$data['width'] .
+            "', height = '" . (float)$data['height'] .
+            "', length_class_id = '" . (int)$data['length_class_id'] .
+            "', status = '" . (int)$data['status'] .
+            "', image = '" . $this->imageUpload($data['image'], $data['model']) .
+            "', tax_class_id = '" . (int)$data['tax_class_id'] .
+            "', date_modified = NOW() WHERE product_id = '" . (int)$productId . "'"
+        );
+
+        $this->db->query("UPDATE " . DB_PREFIX . "product_description SET" .
+            " name = '" . $this->db->escape($data['name']) .
+            "', description = '" . $this->db->escape($data['description']) .
+            "', tag = '" . $this->db->escape($data['tag']) .
+            "', meta_title = '" . $this->db->escape($data['meta_title']) .
+            "', meta_description = '" . $this->db->escape($data['meta_description']) .
+            "', meta_keyword = '" . $this->db->escape($data['meta_keyword']) .
+            "' WHERE product_id = '" . (int)$productId .
+            "' AND language_id = '" . (int)$this->config->get('config_language_id') . "'"
+        );
+
+        $this->db->query("DELETE FROM " . DB_PREFIX . "product_to_category WHERE product_id = '" . (int)$productId . "'");
+
+        $this->db->query("INSERT INTO " . DB_PREFIX . "product_to_category SET product_id = '" . (int)$productId .
+            "', category_id = '" . $data['category_id'] . "'");
+    }
+
+    /**
+     * Image Upload
+     */
+    public function imageUpload($url, $model): ?string
+    {
+        $image = file_get_contents($url);
+        if (empty($image) || !$url) {
+            return null;
+        }
+        $filename = basename($url);
+
+        if (!is_dir(DIR_IMAGE . 'catalog/' . $model)) {
+            mkdir(DIR_IMAGE . 'catalog/' . $model, 0700);
+        }
+        file_put_contents(DIR_IMAGE . 'catalog/' . $model . '/' . $filename, file_get_contents($url));
+        return 'catalog/' . $model . '/' . $filename;
+
+    }
+
+    public function updateStockAndPrice()
+    {
+        if (!$this->auth()) {
+            return false;
+        }
+
+        $productId = $_GET['product_id'];
+        $data = $this->request->post;
+
+        $this->db->query(
+            "UPDATE " . DB_PREFIX . "product SET quantity = '" . (int)$data['quantity'] .
+            "', price = '" . (float)$data['price'] .
+            "', status = '" . (int)$data['status'] .
+            "', date_modified = NOW() WHERE product_id = '" . (int)$productId . "'"
+        );
+    }
+
+    /**
+     * Get Product
+     */
+    public function getProduct($productId)
+    {
+        $DBPREFIX = DB_PREFIX;
+        $languageId = $this->config->get('config_language_id');
+
+        $query = $this->db->query(
+            "SELECT (select cp.category_id
+                        from {$DBPREFIX}product_to_category ptc2
+                                 INNER JOIN {$DBPREFIX}category_path cp on (cp.category_id = ptc2.category_id)
+                        where ptc2.product_id = p.product_id order by cp.level desc limit 1) as category_id,
+                    pd.*, p.*,  m.name AS manufacturer, wcd.unit as weight_unit
+                from {$DBPREFIX}product as p
+                        inner join {$DBPREFIX}product_description as pd on pd.product_id = p.product_id and pd.language_id = $languageId
+                        LEFT JOIN {$DBPREFIX}manufacturer m ON (p.manufacturer_id = m.manufacturer_id)
+                        LEFT JOIN {$DBPREFIX}weight_class wc on (p.weight_class_id = wc.weight_class_id)
+                        LEFT JOIN {$DBPREFIX}weight_class_description wcd on (wc.weight_class_id = wcd.weight_class_id)
+                where p.product_id = '". $productId ."' 
+                order by pd.name, p.model, p.price, p.quantity, p.status, p.sort_order limit 1"
+        );
+
+        $this->setResponseData($query->row);
     }
 }
