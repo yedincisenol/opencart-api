@@ -327,10 +327,6 @@ class Controllercustomapi extends Controller
     public function product()
     {
         if ($this->auth()) {
-
-            if(isset($_GET['product_id'])) {
-                return $this->getProduct($_GET['product_id']);
-            }
             $page = isset($_GET['page']) ? $_GET['page'] : 1;
             $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : self::limit;
             $start = ($page - 1) * $limit;
@@ -602,12 +598,19 @@ class Controllercustomapi extends Controller
         $this->db->query("INSERT INTO " . DB_PREFIX . "product_to_category SET product_id = '" . (int)$productId .
             "', category_id = '" . $data['category_id'] . "'");
 
+        foreach ($data['product_image'] as $product_image) {
+            if ($path = $this->imageUpload($product_image, $data['model'])) {
+                $this->db->query("INSERT INTO " . DB_PREFIX . "product_image SET product_id = '" . (int)$productId .
+                    "', image = '" . $this->db->escape($path) . "'");
+            }
+        }
+
     }
 
     /**
      * Product Update
      */
-    public function UpdateProduct()
+    public function updateProduct()
     {
         if (!$this->auth()) {
             return false;
@@ -646,8 +649,18 @@ class Controllercustomapi extends Controller
 
         $this->db->query("DELETE FROM " . DB_PREFIX . "product_to_category WHERE product_id = '" . (int)$productId . "'");
 
+
         $this->db->query("INSERT INTO " . DB_PREFIX . "product_to_category SET product_id = '" . (int)$productId .
             "', category_id = '" . $data['category_id'] . "'");
+
+        $this->db->query("DELETE FROM " . DB_PREFIX . "product_image WHERE product_id = '" . (int)$productId . "'");
+
+        foreach ($data['product_image'] as $product_image) {
+            if ($path = $this->imageUpload($product_image, $data['model'])) {
+                $this->db->query("INSERT INTO " . DB_PREFIX . "product_image SET product_id = '" . (int)$productId .
+                    "', image = '" . $this->db->escape($path) . "'");
+            }
+        }
     }
 
     /**
@@ -689,13 +702,15 @@ class Controllercustomapi extends Controller
     /**
      * Get Product
      */
-    public function getProduct($productId)
+    public function getProduct()
     {
-        $DBPREFIX = DB_PREFIX;
-        $languageId = $this->config->get('config_language_id');
+        if ($this->auth()) {
+            $productId = $_GET['product_id'];
+            $DBPREFIX = DB_PREFIX;
+            $languageId = $this->config->get('config_language_id');
 
-        $query = $this->db->query(
-            "SELECT (select cp.category_id
+            $query = $this->db->query(
+                "SELECT (select cp.category_id
                         from {$DBPREFIX}product_to_category ptc2
                                  INNER JOIN {$DBPREFIX}category_path cp on (cp.category_id = ptc2.category_id)
                         where ptc2.product_id = p.product_id order by cp.level desc limit 1) as category_id,
@@ -705,10 +720,11 @@ class Controllercustomapi extends Controller
                         LEFT JOIN {$DBPREFIX}manufacturer m ON (p.manufacturer_id = m.manufacturer_id)
                         LEFT JOIN {$DBPREFIX}weight_class wc on (p.weight_class_id = wc.weight_class_id)
                         LEFT JOIN {$DBPREFIX}weight_class_description wcd on (wc.weight_class_id = wcd.weight_class_id)
-                where p.product_id = '". $productId ."' 
+                where p.product_id = '" . $productId . "' 
                 order by pd.name, p.model, p.price, p.quantity, p.status, p.sort_order limit 1"
-        );
+            );
 
-        $this->setResponseData($query->row);
+            $this->setResponseData($query->row);
+        }
     }
 }
