@@ -566,22 +566,42 @@ class Controllercustomapi extends Controller
         if(!$data['model'] || !$data['name'] || !$data['meta_title']) {
             $this->error('Model, ürün başlığı ve seo başlık zorunlu alan');
         }
+        $model              = $this->db->escape($data['model']);
+        $sku                = $this->db->escape($data['sku']) ?? null;
+        $quantity           = $data['quantity'] ?? null;
+        $manufacturerId     = $data['manufacturer_id'] ?? null;
+        $price              = $data['price'] ?? null;
+        $weight             = $data['weight'] ?? null;
+        $weightClassId      = $data['weight_class_id'] ?? null;
+        $length             = $data['length'] ?? null;
+        $width              = $data['width'] ?? null;
+        $height             = $data['height'] ?? null;
+        $lengthClassId      = $data['length_class_id'] ?? null;
+        $status             = $data['status'] ?? null;
+        $taxClassId         = $data['tax_class_id'] ?? null;
+        $name               = $this->db->escape($data['name'] ?? null);
+        $description        = $this->db->escape($data['description'] ?? null);
+        $tag                = $this->db->escape($data['tag'] ?? null);
+        $metaTitle          = $this->db->escape($data['meta_title'] ?? null);
+        $metaDescription    = $this->db->escape($data['meta_description'] ?? null);
+        $metaKeyword        = $this->db->escape($data['meta_keyword'] ?? null);
+        $categoryId         = $this->db->escape($data['category_id'] ?? null);
         $this->db->query(
             "INSERT INTO {$this->DbPrefix}product SET 
-                model = '{$this->db->escape($data['model'])}',
-                sku = ' {$this->db->escape($data['sku'])}',
-                quantity = '{$data['quantity']}',
-                manufacturer_id = '{$data['manufacturer_id']} ',
-                price = '{$data['price']}',
-                weight = '{$data['weight']}',
-                weight_class_id = '{$data['weight_class_id']}',
-                length = '{$data['length']}',
-                width = '{$data['width']}',
-                height = '{$data['height']}',
-                length_class_id = '{$data['length_class_id']}',
-                status = '{$data['status']}',
-                image = '{$this->imageUpload($data['image'], $data['model'])}',
-                tax_class_id = '{$data['tax_class_id']}',
+                model = '{$model}',
+                sku = ' {$sku}',
+                quantity = '{$quantity}',
+                manufacturer_id = '{$manufacturerId} ',
+                price = '{$price}',
+                weight = '{$weight}',
+                weight_class_id = '{$weightClassId}',
+                length = '{$length}',
+                width = '{$width}',
+                height = '{$height}',
+                length_class_id = '{$lengthClassId}',
+                status = '{$status}',
+                image = '{$this->imageUpload($data['image'], $model)}',
+                tax_class_id = '{$taxClassId}',
                 date_added = NOW(), date_modified = NOW();"
         );
 
@@ -592,22 +612,25 @@ class Controllercustomapi extends Controller
             "INSERT INTO {$this->DbPrefix}product_description SET 
                 product_id = '{$productId}',
                 language_id = '{$this->config->get('config_language_id')}',
-                name = '{$this->db->escape($data['name'])}',
-                description = '{$this->db->escape($data['description'])}',
-                tag = '{$this->db->escape($data['tag'])}',
-                meta_title = '{$this->db->escape($data['meta_title'])}',
-                meta_description = '{$this->db->escape($data['meta_description'])}',
-                meta_keyword = '{$this->db->escape($data['meta_keyword'])}';"
+                name = '{$name}',
+                description = '{$description}',
+                tag = '{$tag}',
+                meta_title = '{$metaTitle}',
+                meta_description = '{$metaDescription}',
+                meta_keyword = '{$metaKeyword}';"
         );
 
-        $this->db->query("INSERT INTO {$this->DbPrefix}product_to_category SET product_id = '{$productId}', category_id = '{$data['category_id']}';");
+        $this->db->query("INSERT INTO {$this->DbPrefix}product_to_category SET product_id = '{$productId}', category_id = '{$categoryId}';");
 
-        foreach ($data['product_image'] as $product_image) {
-            if ($path = $this->imageUpload($product_image, $data['model'])) {
+        foreach ($data['product_images'] ?? [] as $product_image) {
+            if ($path = $this->imageUpload($product_image, $model)) {
                 $this->db->query("INSERT INTO {$this->DbPrefix}product_image SET product_id = '{$productId}', image = '{$this->db->escape($path)}';");
             }
         }
 
+        $query = $this->getProductQuery($productId);
+
+        $this->setResponseData($query->row);
     }
 
     /**
@@ -620,47 +643,72 @@ class Controllercustomapi extends Controller
         }
         $productId = $_GET['product_id'];
         $data = $this->request->post;
+
+        $model              = $this->db->escape($data['model']);
+        $sku                = $this->db->escape($data['sku']) ?? null;
+        $quantity           = $data['quantity'] ?? null;
+        $manufacturerId     = $data['manufacturer_id'] ?? null;
+        $price              = $data['price'] ?? null;
+        $weight             = $data['weight'] ?? null;
+        $weightClassId      = $data['weight_class_id'] ?? null;
+        $length             = $data['length'] ?? null;
+        $width              = $data['width'] ?? null;
+        $height             = $data['height'] ?? null;
+        $lengthClassId      = $data['length_class_id'] ?? null;
+        $status             = $data['status'] ?? null;
+        $taxClassId         = $data['tax_class_id'] ?? null;
+        $name               = $this->db->escape($data['name'] ?? null);
+        $description        = $this->db->escape($data['description'] ?? null);
+        $tag                = $this->db->escape($data['tag'] ?? null);
+        $metaTitle          = $this->db->escape($data['meta_title'] ?? null);
+        $metaDescription    = $this->db->escape($data['meta_description'] ?? null);
+        $metaKeyword        = $this->db->escape($data['meta_keyword'] ?? null);
+        $categoryId         = $this->db->escape($data['category_id'] ?? null);
         $this->db->query(
-            "UPDATE {$this->DbPrefix}product SET model = '{$this->db->escape($data['model'])}',
-                sku = '{$this->db->escape($data['sku'])}',
-                quantity = '{$data['quantity']}',
-                manufacturer_id = '{$data['manufacturer_id']}',
-                price = '{$data['price']}',
-                weight = '{$data['weight']}',
-                weight_class_id = '{$data['weight_class_id']}',
-                length = '{$data['length']}',
-                width = '{$data['width']}',
-                height = '{$data['height']}',
-                length_class_id = '{$data['length_class_id']}',
-                status = '{$data['status']}',
-                image = '{$this->imageUpload($data['image'], $data['model'])}',
-                tax_class_id = '{$data['tax_class_id']}',
+            "UPDATE {$this->DbPrefix}product SET model = '{$this->db->escape($model)}',
+                sku = '{$this->db->escape($sku)}',
+                quantity = '{$quantity}',
+                manufacturer_id = '{$manufacturerId}',
+                price = '{$price}',
+                weight = '{$weight}',
+                weight_class_id = '{$weightClassId}',
+                length = '{$length}',
+                width = '{$width}',
+                height = '{$height}',
+                length_class_id = '{$lengthClassId}',
+                status = '{$status}',
+                image = '{$this->imageUpload($data['image'], $model)}',
+                tax_class_id = '{$taxClassId}',
                 date_modified = NOW() WHERE product_id = '{$productId}';"
         );
 
         $this->db->query(
             "UPDATE {$this->DbPrefix}product_description SET 
-                name = '{$this->db->escape($data['name'])}',
-                description = '{$this->db->escape($data['description'])}',
-                tag = '{$this->db->escape($data['tag'])}',
-                meta_title = '{$this->db->escape($data['meta_title'])}',
-                meta_description = '{$this->db->escape($data['meta_description'])}',
-                meta_keyword = '{$this->db->escape($data['meta_keyword'])}'
+                name = '{$this->db->escape($name)}',
+                description = '{$this->db->escape($description)}',
+                tag = '{$tag}',
+                meta_title = '{$metaTitle}',
+                meta_description = '{$metaDescription}',
+                meta_keyword = '{$metaKeyword}'
             WHERE product_id = '{$productId}' AND language_id = '{$this->config->get('config_language_id')}';"
         );
 
         $this->db->query("DELETE FROM {$this->DbPrefix}product_to_category WHERE product_id = '{$productId}';");
 
 
-        $this->db->query("INSERT INTO {$this->DbPrefix}product_to_category SET product_id = '{$productId}', category_id = '{$data['category_id']}';");
+        $this->db->query("INSERT INTO {$this->DbPrefix}product_to_category SET product_id = '{$productId}', category_id = '{$categoryId}';");
 
         $this->db->query("DELETE FROM {$this->DbPrefix}product_image WHERE product_id = '{$productId}';");
 
-        foreach ($data['product_image'] as $product_image) {
-            if ($path = $this->imageUpload($product_image, $data['model'])) {
+        foreach ($data['product_images'] ?? [] as $product_image) {
+            if ($path = $this->imageUpload($product_image, $model)) {
                 $this->db->query("INSERT INTO {$this->DbPrefix}product_image SET product_id = '{$productId} ', image = '{$this->db->escape($path)}';");
             }
         }
+
+        $query = $this->getProductQuery($productId);
+
+        $this->setResponseData($query->row);
     }
 
     /**
@@ -697,6 +745,10 @@ class Controllercustomapi extends Controller
                  status = '{$data['status']}',
                  date_modified = NOW() WHERE product_id = '{$productId}';"
         );
+
+        $query = $this->getProductQuery($productId);
+
+        $this->setResponseData($query->row);
     }
 
     /**
@@ -706,10 +758,18 @@ class Controllercustomapi extends Controller
     {
         if ($this->auth()) {
             $productId = $_GET['product_id'];
-            $languageId = $this->config->get('config_language_id');
 
-            $query = $this->db->query(
-                "SELECT (select cp.category_id
+            $query = $this->getProductQuery($productId);
+
+            $this->setResponseData($query->row);
+        }
+    }
+
+    private function getProductQuery($productId) {
+        $languageId = $this->config->get('config_language_id');
+
+        return $this->db->query(
+            "SELECT (select cp.category_id
                         from {$this->DbPrefix}product_to_category ptc2
                                  INNER JOIN {$this->DbPrefix}category_path cp on (cp.category_id = ptc2.category_id)
                         where ptc2.product_id = p.product_id order by cp.level desc limit 1) as category_id,
@@ -721,9 +781,6 @@ class Controllercustomapi extends Controller
                         LEFT JOIN {$this->DbPrefix}weight_class_description wcd on (wc.weight_class_id = wcd.weight_class_id)
                 where p.product_id = '" . $productId . "' 
                 order by pd.name, p.model, p.price, p.quantity, p.status, p.sort_order limit 1"
-            );
-
-            $this->setResponseData($query->row);
-        }
+        );
     }
 }
