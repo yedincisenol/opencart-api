@@ -18,7 +18,7 @@ class Controllercustomapi extends Controller
         'data' => [],
         'meta' => []
     ];
-    private $DbPrefix = DB_PREFIX;
+    private string $dbPrefix = DB_PREFIX;
     public function __construct($registry)
     {
         parent::__construct($registry);
@@ -310,13 +310,14 @@ class Controllercustomapi extends Controller
      */
     private function getTotalsTaxRate($key, $countryID)
     {
-        $query = $this->db->query("select {$this->DbPrefix}tax_rate.* from {$this->DbPrefix}tax_rate
-                inner join {$this->DbPrefix}setting on {$this->DbPrefix}setting.`key` = '{$key}_tax_class_id'
-                INNER JOIN {$this->DbPrefix}tax_class on {$this->DbPrefix}tax_class.tax_class_id = {$this->DbPrefix}setting.value
-                INNER JOIN {$this->DbPrefix}zone_to_geo_zone on {$this->DbPrefix}zone_to_geo_zone.country_id = {$countryID}
-                left JOIN {$this->DbPrefix}tax_rule on {$this->DbPrefix}tax_rule.tax_class_id =  {$this->DbPrefix}tax_class.tax_class_id
-            where {$this->DbPrefix}tax_rate.geo_zone_id = {$this->DbPrefix}zone_to_geo_zone.geo_zone_id and {$this->DbPrefix}tax_rule.tax_rate_id = {$this->DbPrefix}tax_rate.tax_rate_id
-            group by {$this->DbPrefix}tax_rate.tax_rate_id");
+        $prefix = $this->dbPrefix;
+        $query = $this->db->query("select {$prefix}tax_rate.* from {$prefix}tax_rate
+                inner join {$prefix}setting on {$prefix}setting.`key` = '{$key}_tax_class_id'
+                INNER JOIN {$prefix}tax_class on {$prefix}tax_class.tax_class_id = {$prefix}setting.value
+                INNER JOIN {$prefix}zone_to_geo_zone on {$prefix}zone_to_geo_zone.country_id = {$countryID}
+                left JOIN {$prefix}tax_rule on {$prefix}tax_rule.tax_class_id =  {$prefix}tax_class.tax_class_id
+            where {$prefix}tax_rate.geo_zone_id = {$prefix}zone_to_geo_zone.geo_zone_id and {$prefix}tax_rule.tax_rate_id = {$prefix}tax_rate.tax_rate_id
+            group by {$prefix}tax_rate.tax_rate_id");
 
         return $query->rows;
     }
@@ -331,18 +332,19 @@ class Controllercustomapi extends Controller
             $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : self::limit;
             $start = ($page - 1) * $limit;
             $languageId = $this->config->get('config_language_id');
+            $prefix = $this->dbPrefix;
             // get products
             $query = $this->db->query(
                 "SELECT (select cp.category_id
-                        from {$this->DbPrefix}product_to_category ptc2
-                                 INNER JOIN {$this->DbPrefix}category_path cp on (cp.category_id = ptc2.category_id)
+                        from {$prefix}product_to_category ptc2
+                                 INNER JOIN {$prefix}category_path cp on (cp.category_id = ptc2.category_id)
                         where ptc2.product_id = p.product_id order by cp.level desc limit 1) as category_id,
                     pd.*, p.*,  m.name AS manufacturer, wcd.unit as weight_unit
-                from {$this->DbPrefix}product as p
-                        inner join {$this->DbPrefix}product_description as pd on pd.product_id = p.product_id and pd.language_id = $languageId
-                        LEFT JOIN {$this->DbPrefix}manufacturer m ON (p.manufacturer_id = m.manufacturer_id)
-                        LEFT JOIN {$this->DbPrefix}weight_class wc on (p.weight_class_id = wc.weight_class_id)
-                        LEFT JOIN {$this->DbPrefix}weight_class_description wcd on (wc.weight_class_id = wcd.weight_class_id)
+                from {$prefix}product as p
+                        inner join {$prefix}product_description as pd on pd.product_id = p.product_id and pd.language_id = $languageId
+                        LEFT JOIN {$prefix}manufacturer m ON (p.manufacturer_id = m.manufacturer_id)
+                        LEFT JOIN {$prefix}weight_class wc on (p.weight_class_id = wc.weight_class_id)
+                        LEFT JOIN {$prefix}weight_class_description wcd on (wc.weight_class_id = wcd.weight_class_id)
                 order by pd.name, p.model, p.price, p.quantity, p.status, p.sort_order
                 limit $start, $limit"
             );
@@ -558,13 +560,13 @@ class Controllercustomapi extends Controller
     public function createProduct()
     {
         if (!$this->auth()) {
-            $this->error('Geçersiz AccessToken.');
+            return $this->error('Geçersiz AccessToken.');
         }
 
         $data = $this->request->post;
 
         if(!$data['model'] || !$data['name'] || !$data['meta_title']) {
-            $this->error('Model, ürün başlığı ve seo başlık zorunlu alan');
+            return $this->error('Model, ürün başlığı ve seo başlık zorunlu alan');
         }
         $model              = $this->db->escape($data['model']);
         $sku                = $this->db->escape($data['sku']) ?? null;
@@ -587,7 +589,7 @@ class Controllercustomapi extends Controller
         $metaKeyword        = $this->db->escape($data['meta_keyword'] ?? null);
         $categoryId         = $this->db->escape($data['category_id'] ?? null);
         $this->db->query(
-            "INSERT INTO {$this->DbPrefix}product SET 
+            "INSERT INTO {$this->dbPrefix}product SET 
                 model = '{$model}',
                 sku = ' {$sku}',
                 quantity = '{$quantity}',
@@ -606,10 +608,10 @@ class Controllercustomapi extends Controller
         );
 
         $productId = $this->db->getLastId();
-        $this->db->query("INSERT INTO  {$this->DbPrefix}product_to_store SET product_id = '{$productId}',store_id = '{$this->config->get('config_store_id')}';");
+        $this->db->query("INSERT INTO  {$this->dbPrefix}product_to_store SET product_id = '{$productId}',store_id = '{$this->config->get('config_store_id')}';");
 
         $this->db->query(
-            "INSERT INTO {$this->DbPrefix}product_description SET 
+            "INSERT INTO {$this->dbPrefix}product_description SET 
                 product_id = '{$productId}',
                 language_id = '{$this->config->get('config_language_id')}',
                 name = '{$name}',
@@ -620,11 +622,11 @@ class Controllercustomapi extends Controller
                 meta_keyword = '{$metaKeyword}';"
         );
 
-        $this->db->query("INSERT INTO {$this->DbPrefix}product_to_category SET product_id = '{$productId}', category_id = '{$categoryId}';");
+        $this->db->query("INSERT INTO {$this->dbPrefix}product_to_category SET product_id = '{$productId}', category_id = '{$categoryId}';");
 
         foreach ($data['product_images'] ?? [] as $product_image) {
             if ($path = $this->imageUpload($product_image, $model)) {
-                $this->db->query("INSERT INTO {$this->DbPrefix}product_image SET product_id = '{$productId}', image = '{$this->db->escape($path)}';");
+                $this->db->query("INSERT INTO {$this->dbPrefix}product_image SET product_id = '{$productId}', image = '{$this->db->escape($path)}';");
             }
         }
 
@@ -665,7 +667,7 @@ class Controllercustomapi extends Controller
         $metaKeyword        = $this->db->escape($data['meta_keyword'] ?? null);
         $categoryId         = $this->db->escape($data['category_id'] ?? null);
         $this->db->query(
-            "UPDATE {$this->DbPrefix}product SET model = '{$this->db->escape($model)}',
+            "UPDATE {$this->dbPrefix}product SET model = '{$this->db->escape($model)}',
                 sku = '{$this->db->escape($sku)}',
                 quantity = '{$quantity}',
                 manufacturer_id = '{$manufacturerId}',
@@ -683,7 +685,7 @@ class Controllercustomapi extends Controller
         );
 
         $this->db->query(
-            "UPDATE {$this->DbPrefix}product_description SET 
+            "UPDATE {$this->dbPrefix}product_description SET 
                 name = '{$this->db->escape($name)}',
                 description = '{$this->db->escape($description)}',
                 tag = '{$tag}',
@@ -693,16 +695,16 @@ class Controllercustomapi extends Controller
             WHERE product_id = '{$productId}' AND language_id = '{$this->config->get('config_language_id')}';"
         );
 
-        $this->db->query("DELETE FROM {$this->DbPrefix}product_to_category WHERE product_id = '{$productId}';");
+        $this->db->query("DELETE FROM {$this->dbPrefix}product_to_category WHERE product_id = '{$productId}';");
 
 
-        $this->db->query("INSERT INTO {$this->DbPrefix}product_to_category SET product_id = '{$productId}', category_id = '{$categoryId}';");
+        $this->db->query("INSERT INTO {$this->dbPrefix}product_to_category SET product_id = '{$productId}', category_id = '{$categoryId}';");
 
-        $this->db->query("DELETE FROM {$this->DbPrefix}product_image WHERE product_id = '{$productId}';");
+        $this->db->query("DELETE FROM {$this->dbPrefix}product_image WHERE product_id = '{$productId}';");
 
         foreach ($data['product_images'] ?? [] as $product_image) {
             if ($path = $this->imageUpload($product_image, $model)) {
-                $this->db->query("INSERT INTO {$this->DbPrefix}product_image SET product_id = '{$productId} ', image = '{$this->db->escape($path)}';");
+                $this->db->query("INSERT INTO {$this->dbPrefix}product_image SET product_id = '{$productId} ', image = '{$this->db->escape($path)}';");
             }
         }
 
@@ -739,7 +741,7 @@ class Controllercustomapi extends Controller
         $productId = $_GET['product_id'];
         $data = $this->request->post;
         $this->db->query(
-            "UPDATE  {$this->DbPrefix}product SET 
+            "UPDATE  {$this->dbPrefix}product SET 
                  quantity = '{$data['quantity']}',
                  price = '{$data['price']}',
                  status = '{$data['status']}',
@@ -770,15 +772,15 @@ class Controllercustomapi extends Controller
 
         return $this->db->query(
             "SELECT (select cp.category_id
-                        from {$this->DbPrefix}product_to_category ptc2
-                                 INNER JOIN {$this->DbPrefix}category_path cp on (cp.category_id = ptc2.category_id)
+                        from {$this->dbPrefix}product_to_category ptc2
+                                 INNER JOIN {$this->dbPrefix}category_path cp on (cp.category_id = ptc2.category_id)
                         where ptc2.product_id = p.product_id order by cp.level desc limit 1) as category_id,
                     pd.*, p.*,  m.name AS manufacturer, wcd.unit as weight_unit
-                from {$this->DbPrefix}product as p
-                        inner join {$this->DbPrefix}product_description as pd on pd.product_id = p.product_id and pd.language_id = $languageId
-                        LEFT JOIN {$this->DbPrefix}manufacturer m ON (p.manufacturer_id = m.manufacturer_id)
-                        LEFT JOIN {$this->DbPrefix}weight_class wc on (p.weight_class_id = wc.weight_class_id)
-                        LEFT JOIN {$this->DbPrefix}weight_class_description wcd on (wc.weight_class_id = wcd.weight_class_id)
+                from {$this->dbPrefix}product as p
+                        inner join {$this->dbPrefix}product_description as pd on pd.product_id = p.product_id and pd.language_id = $languageId
+                        LEFT JOIN {$this->dbPrefix}manufacturer m ON (p.manufacturer_id = m.manufacturer_id)
+                        LEFT JOIN {$this->dbPrefix}weight_class wc on (p.weight_class_id = wc.weight_class_id)
+                        LEFT JOIN {$this->dbPrefix}weight_class_description wcd on (wc.weight_class_id = wcd.weight_class_id)
                 where p.product_id = '" . $productId . "' 
                 order by pd.name, p.model, p.price, p.quantity, p.status, p.sort_order limit 1"
         );
