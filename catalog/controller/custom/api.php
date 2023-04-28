@@ -10,7 +10,6 @@ include_once 'catalog/model/checkout/order.php';
 
 class Controllercustomapi extends Controller
 {
-
     const limit = 15;
 
     private $dbColumnName = 'username';
@@ -19,8 +18,7 @@ class Controllercustomapi extends Controller
         'data' => [],
         'meta' => []
     ];
-
-
+    private string $dbPrefix = DB_PREFIX;
     public function __construct($registry)
     {
         parent::__construct($registry);
@@ -30,7 +28,6 @@ class Controllercustomapi extends Controller
             $this->dbColumnName = 'name';
         }
     }
-
 
     /**
      * Authenticate user
@@ -66,7 +63,6 @@ class Controllercustomapi extends Controller
         return $this->error();
     }
 
-
     /**
      * @param $token
      *
@@ -90,7 +86,6 @@ class Controllercustomapi extends Controller
         }
         return $decodedJson;
     }
-
 
     /**
      * @return bool|void
@@ -130,7 +125,6 @@ class Controllercustomapi extends Controller
         $this->data = $json;
     }
 
-
     /**
      * @param null $msg
      *
@@ -143,6 +137,7 @@ class Controllercustomapi extends Controller
         }
 
         unset($this->data['data'], $this->data['meta']);
+        $this->data['error'] = true;
         $this->data['message'] = $msg;
 
         return false;
@@ -177,7 +172,6 @@ class Controllercustomapi extends Controller
             $this->setResponseData($taxes);
         }
     }
-
 
     /**
      * Order List
@@ -316,14 +310,14 @@ class Controllercustomapi extends Controller
      */
     private function getTotalsTaxRate($key, $countryID)
     {
-        $DBPREFIX = DB_PREFIX;
-        $query = $this->db->query("select {$DBPREFIX}tax_rate.* from {$DBPREFIX}tax_rate
-              inner join {$DBPREFIX}setting on {$DBPREFIX}setting.`key` = '{$key}_tax_class_id'
-                INNER JOIN {$DBPREFIX}tax_class on {$DBPREFIX}tax_class.tax_class_id = {$DBPREFIX}setting.value
-              INNER JOIN {$DBPREFIX}zone_to_geo_zone on {$DBPREFIX}zone_to_geo_zone.country_id = {$countryID}
-              left JOIN {$DBPREFIX}tax_rule on {$DBPREFIX}tax_rule.tax_class_id =  {$DBPREFIX}tax_class.tax_class_id
-            where {$DBPREFIX}tax_rate.geo_zone_id = {$DBPREFIX}zone_to_geo_zone.geo_zone_id and {$DBPREFIX}tax_rule.tax_rate_id = {$DBPREFIX}tax_rate.tax_rate_id
-            group by {$DBPREFIX}tax_rate.tax_rate_id");
+        $prefix = $this->dbPrefix;
+        $query = $this->db->query("select {$prefix}tax_rate.* from {$prefix}tax_rate
+                inner join {$prefix}setting on {$prefix}setting.`key` = '{$key}_tax_class_id'
+                INNER JOIN {$prefix}tax_class on {$prefix}tax_class.tax_class_id = {$prefix}setting.value
+                INNER JOIN {$prefix}zone_to_geo_zone on {$prefix}zone_to_geo_zone.country_id = {$countryID}
+                left JOIN {$prefix}tax_rule on {$prefix}tax_rule.tax_class_id =  {$prefix}tax_class.tax_class_id
+            where {$prefix}tax_rate.geo_zone_id = {$prefix}zone_to_geo_zone.geo_zone_id and {$prefix}tax_rule.tax_rate_id = {$prefix}tax_rate.tax_rate_id
+            group by {$prefix}tax_rate.tax_rate_id");
 
         return $query->rows;
     }
@@ -337,21 +331,20 @@ class Controllercustomapi extends Controller
             $page = isset($_GET['page']) ? $_GET['page'] : 1;
             $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : self::limit;
             $start = ($page - 1) * $limit;
-
-            $DBPREFIX = DB_PREFIX;
             $languageId = $this->config->get('config_language_id');
+            $prefix = $this->dbPrefix;
             // get products
             $query = $this->db->query(
                 "SELECT (select cp.category_id
-                        from {$DBPREFIX}product_to_category ptc2
-                                 INNER JOIN {$DBPREFIX}category_path cp on (cp.category_id = ptc2.category_id)
+                        from {$prefix}product_to_category ptc2
+                                 INNER JOIN {$prefix}category_path cp on (cp.category_id = ptc2.category_id)
                         where ptc2.product_id = p.product_id order by cp.level desc limit 1) as category_id,
                     pd.*, p.*,  m.name AS manufacturer, wcd.unit as weight_unit
-                from {$DBPREFIX}product as p
-                        inner join {$DBPREFIX}product_description as pd on pd.product_id = p.product_id and pd.language_id = $languageId
-                        LEFT JOIN {$DBPREFIX}manufacturer m ON (p.manufacturer_id = m.manufacturer_id)
-                        LEFT JOIN {$DBPREFIX}weight_class wc on (p.weight_class_id = wc.weight_class_id)
-                        LEFT JOIN {$DBPREFIX}weight_class_description wcd on (wc.weight_class_id = wcd.weight_class_id)
+                from {$prefix}product as p
+                        inner join {$prefix}product_description as pd on pd.product_id = p.product_id and pd.language_id = $languageId
+                        LEFT JOIN {$prefix}manufacturer m ON (p.manufacturer_id = m.manufacturer_id)
+                        LEFT JOIN {$prefix}weight_class wc on (p.weight_class_id = wc.weight_class_id)
+                        LEFT JOIN {$prefix}weight_class_description wcd on (wc.weight_class_id = wcd.weight_class_id)
                 order by pd.name, p.model, p.price, p.quantity, p.status, p.sort_order
                 limit $start, $limit"
             );
@@ -394,16 +387,16 @@ class Controllercustomapi extends Controller
         return array_slice($results, ($page - 1) * $limit, $limit);
     }
 
+    /**
+     * Order List
+     */
     private function getOrders($data = array())
     {
-
         $sql = 'SELECT o.*, (SELECT os.name FROM ' . DB_PREFIX . "order_status os WHERE os.order_status_id = o.order_status_id AND os.language_id = '" . (int)$this->config->get('config_language_id') . "') AS status, o.shipping_code, o.total, o.currency_code, o.currency_value, o.date_added, o.date_modified, (SELECT custom_field FROM " . DB_PREFIX . 'customer where customer_id = o.customer_id) as customer_custom_field FROM `' . DB_PREFIX . 'order` o';
 
         if (isset($data['filter_order_status'])) {
             $implode = array();
-
             $order_statuses = explode(',', $data['filter_order_status']);
-
             foreach ($order_statuses as $order_status_id) {
                 $implode[] = "o.order_status_id = '" . (int)$order_status_id . "'";
             }
@@ -449,7 +442,7 @@ class Controllercustomapi extends Controller
         if (isset($data['sort']) && in_array($data['sort'], $sort_data)) {
             $sql .= ' ORDER BY ' . $data['sort'];
         } else {
-            $sql .= ' ORDER BY o.order_id';
+            $sql .= ' ORDER BY o.date_modified';
         }
 
         if (isset($data['order']) && ($data['order'] == 'DESC')) {
@@ -463,7 +456,6 @@ class Controllercustomapi extends Controller
         return $query->rows;
     }
 
-
     /**
      * @param $string
      * @param $startString
@@ -476,7 +468,6 @@ class Controllercustomapi extends Controller
 
         return (substr($string, 0, $len) === $startString);
     }
-
 
     /**
      * Echo response
@@ -493,7 +484,7 @@ class Controllercustomapi extends Controller
         $this->response->addHeader('X-Opencart-Version: ' . VERSION);
         $this->response->addHeader('Content-Type: application/json');
         if(!$this->response->getOutput()) {
-            $this->response->setOutput(json_encode($this->data));	        	    
+            $this->response->setOutput(json_encode($this->data));
         }
     }
 
@@ -505,6 +496,9 @@ class Controllercustomapi extends Controller
         $this->response();
     }
 
+    /**
+     * Order Status
+     */
     public function orderStatus()
     {
         $request = json_decode(file_get_contents('php://input'), true);
@@ -527,6 +521,7 @@ class Controllercustomapi extends Controller
             $this->setResponseData($manufacturers);
         }
     }
+
     /**
      * lengthCLass List
      */
@@ -541,5 +536,253 @@ class Controllercustomapi extends Controller
             $query = $this->db->query($sql);
             $this->setResponseData($query->rows);
         }
+    }
+
+    /**
+     * weightClass List
+     */
+    public function weightClass()
+    {
+        if ($this->auth()) {
+
+            $sql = "select wd.unit, wd.title, w.weight_class_id from " . DB_PREFIX . "weight_class w
+                left join " . DB_PREFIX . "weight_class_description wd on w.weight_class_id = wd.weight_class_id
+            Where wd.language_id = " . (int)$this->config->get('config_language_id');
+
+            $query = $this->db->query($sql);
+            $this->setResponseData($query->rows);
+        }
+    }
+
+    /**
+     * Product Create
+     */
+    public function createProduct()
+    {
+        if (!$this->auth()) {
+            return $this->error('Geçersiz AccessToken.');
+        }
+
+        $data = $this->request->post;
+
+        if(!$data['model'] || !$data['name'] || !$data['meta_title']) {
+            return $this->error('Model, ürün başlığı ve seo başlık zorunlu alan');
+        }
+        $model              = $this->db->escape($data['model']);
+        $sku                = $this->db->escape($data['sku']) ?? null;
+        $quantity           = $data['quantity'] ?? null;
+        $manufacturerId     = $data['manufacturer_id'] ?? null;
+        $price              = $data['price'] ?? null;
+        $weight             = $data['weight'] ?? null;
+        $weightClassId      = $data['weight_class_id'] ?? null;
+        $length             = $data['length'] ?? null;
+        $width              = $data['width'] ?? null;
+        $height             = $data['height'] ?? null;
+        $lengthClassId      = $data['length_class_id'] ?? null;
+        $status             = $data['status'] ?? null;
+        $taxClassId         = $data['tax_class_id'] ?? null;
+        $name               = $this->db->escape($data['name'] ?? null);
+        $description        = $this->db->escape($data['description'] ?? null);
+        $tag                = $this->db->escape($data['tag'] ?? null);
+        $metaTitle          = $this->db->escape($data['meta_title'] ?? null);
+        $metaDescription    = $this->db->escape($data['meta_description'] ?? null);
+        $metaKeyword        = $this->db->escape($data['meta_keyword'] ?? null);
+        $categoryId         = $this->db->escape($data['category_id'] ?? null);
+        $this->db->query(
+            "INSERT INTO {$this->dbPrefix}product SET 
+                model = '{$model}',
+                sku = ' {$sku}',
+                quantity = '{$quantity}',
+                manufacturer_id = '{$manufacturerId} ',
+                price = '{$price}',
+                weight = '{$weight}',
+                weight_class_id = '{$weightClassId}',
+                length = '{$length}',
+                width = '{$width}',
+                height = '{$height}',
+                length_class_id = '{$lengthClassId}',
+                status = '{$status}',
+                image = '{$this->imageUpload($data['image'], $model)}',
+                tax_class_id = '{$taxClassId}',
+                date_added = NOW(), date_modified = NOW();"
+        );
+
+        $productId = $this->db->getLastId();
+        $this->db->query("INSERT INTO  {$this->dbPrefix}product_to_store SET product_id = '{$productId}',store_id = '{$this->config->get('config_store_id')}';");
+
+        $this->db->query(
+            "INSERT INTO {$this->dbPrefix}product_description SET 
+                product_id = '{$productId}',
+                language_id = '{$this->config->get('config_language_id')}',
+                name = '{$name}',
+                description = '{$description}',
+                tag = '{$tag}',
+                meta_title = '{$metaTitle}',
+                meta_description = '{$metaDescription}',
+                meta_keyword = '{$metaKeyword}';"
+        );
+
+        $this->db->query("INSERT INTO {$this->dbPrefix}product_to_category SET product_id = '{$productId}', category_id = '{$categoryId}';");
+
+        foreach ($data['product_images'] ?? [] as $product_image) {
+            if ($path = $this->imageUpload($product_image, $model)) {
+                $this->db->query("INSERT INTO {$this->dbPrefix}product_image SET product_id = '{$productId}', image = '{$this->db->escape($path)}';");
+            }
+        }
+
+        $query = $this->getProductQuery($productId);
+
+        $this->setResponseData($query->row);
+    }
+
+    /**
+     * Product Update
+     */
+    public function updateProduct()
+    {
+        if (!$this->auth()) {
+            return false;
+        }
+        $productId = $_GET['product_id'];
+        $data = $this->request->post;
+
+        $model              = $this->db->escape($data['model']);
+        $sku                = $this->db->escape($data['sku']) ?? null;
+        $quantity           = $data['quantity'] ?? null;
+        $manufacturerId     = $data['manufacturer_id'] ?? null;
+        $price              = $data['price'] ?? null;
+        $weight             = $data['weight'] ?? null;
+        $weightClassId      = $data['weight_class_id'] ?? null;
+        $length             = $data['length'] ?? null;
+        $width              = $data['width'] ?? null;
+        $height             = $data['height'] ?? null;
+        $lengthClassId      = $data['length_class_id'] ?? null;
+        $status             = $data['status'] ?? null;
+        $taxClassId         = $data['tax_class_id'] ?? null;
+        $name               = $this->db->escape($data['name'] ?? null);
+        $description        = $this->db->escape($data['description'] ?? null);
+        $tag                = $this->db->escape($data['tag'] ?? null);
+        $metaTitle          = $this->db->escape($data['meta_title'] ?? null);
+        $metaDescription    = $this->db->escape($data['meta_description'] ?? null);
+        $metaKeyword        = $this->db->escape($data['meta_keyword'] ?? null);
+        $categoryId         = $this->db->escape($data['category_id'] ?? null);
+        $this->db->query(
+            "UPDATE {$this->dbPrefix}product SET model = '{$this->db->escape($model)}',
+                sku = '{$this->db->escape($sku)}',
+                quantity = '{$quantity}',
+                manufacturer_id = '{$manufacturerId}',
+                price = '{$price}',
+                weight = '{$weight}',
+                weight_class_id = '{$weightClassId}',
+                length = '{$length}',
+                width = '{$width}',
+                height = '{$height}',
+                length_class_id = '{$lengthClassId}',
+                status = '{$status}',
+                image = '{$this->imageUpload($data['image'], $model)}',
+                tax_class_id = '{$taxClassId}',
+                date_modified = NOW() WHERE product_id = '{$productId}';"
+        );
+
+        $this->db->query(
+            "UPDATE {$this->dbPrefix}product_description SET 
+                name = '{$this->db->escape($name)}',
+                description = '{$this->db->escape($description)}',
+                tag = '{$tag}',
+                meta_title = '{$metaTitle}',
+                meta_description = '{$metaDescription}',
+                meta_keyword = '{$metaKeyword}'
+            WHERE product_id = '{$productId}' AND language_id = '{$this->config->get('config_language_id')}';"
+        );
+
+        $this->db->query("DELETE FROM {$this->dbPrefix}product_to_category WHERE product_id = '{$productId}';");
+
+
+        $this->db->query("INSERT INTO {$this->dbPrefix}product_to_category SET product_id = '{$productId}', category_id = '{$categoryId}';");
+
+        $this->db->query("DELETE FROM {$this->dbPrefix}product_image WHERE product_id = '{$productId}';");
+
+        foreach ($data['product_images'] ?? [] as $product_image) {
+            if ($path = $this->imageUpload($product_image, $model)) {
+                $this->db->query("INSERT INTO {$this->dbPrefix}product_image SET product_id = '{$productId} ', image = '{$this->db->escape($path)}';");
+            }
+        }
+
+        $query = $this->getProductQuery($productId);
+
+        $this->setResponseData($query->row);
+    }
+
+    /**
+     * Image Upload
+     */
+    public function imageUpload($url, $model): ?string
+    {
+        $image = file_get_contents($url);
+        if (empty($image) || !$url) {
+            return null;
+        }
+        $filename = basename($url);
+
+        if (!is_dir(DIR_IMAGE . 'catalog/' . $model)) {
+            mkdir(DIR_IMAGE . 'catalog/' . $model, 0700);
+        }
+        file_put_contents(DIR_IMAGE . 'catalog/' . $model . '/' . $filename, file_get_contents($url));
+        return 'catalog/' . $model . '/' . $filename;
+
+    }
+
+    public function updateStockAndPrice()
+    {
+        if (!$this->auth()) {
+            return false;
+        }
+
+        $productId = $_GET['product_id'];
+        $data = $this->request->post;
+        $this->db->query(
+            "UPDATE  {$this->dbPrefix}product SET 
+                 quantity = '{$data['quantity']}',
+                 price = '{$data['price']}',
+                 status = '{$data['status']}',
+                 date_modified = NOW() WHERE product_id = '{$productId}';"
+        );
+
+        $query = $this->getProductQuery($productId);
+
+        $this->setResponseData($query->row);
+    }
+
+    /**
+     * Get Product
+     */
+    public function getProduct()
+    {
+        if ($this->auth()) {
+            $productId = $_GET['product_id'];
+
+            $query = $this->getProductQuery($productId);
+
+            $this->setResponseData($query->row);
+        }
+    }
+
+    private function getProductQuery($productId) {
+        $languageId = $this->config->get('config_language_id');
+
+        return $this->db->query(
+            "SELECT (select cp.category_id
+                        from {$this->dbPrefix}product_to_category ptc2
+                                 INNER JOIN {$this->dbPrefix}category_path cp on (cp.category_id = ptc2.category_id)
+                        where ptc2.product_id = p.product_id order by cp.level desc limit 1) as category_id,
+                    pd.*, p.*,  m.name AS manufacturer, wcd.unit as weight_unit
+                from {$this->dbPrefix}product as p
+                        inner join {$this->dbPrefix}product_description as pd on pd.product_id = p.product_id and pd.language_id = $languageId
+                        LEFT JOIN {$this->dbPrefix}manufacturer m ON (p.manufacturer_id = m.manufacturer_id)
+                        LEFT JOIN {$this->dbPrefix}weight_class wc on (p.weight_class_id = wc.weight_class_id)
+                        LEFT JOIN {$this->dbPrefix}weight_class_description wcd on (wc.weight_class_id = wcd.weight_class_id)
+                where p.product_id = '" . $productId . "' 
+                order by pd.name, p.model, p.price, p.quantity, p.status, p.sort_order limit 1"
+        );
     }
 }
