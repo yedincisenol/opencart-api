@@ -18,7 +18,7 @@ class Controllercustomapi extends Controller
         'data' => [],
         'meta' => []
     ];
-    private string $dbPrefix = DB_PREFIX;
+    private $dbPrefix = DB_PREFIX;
     public function __construct($registry)
     {
         parent::__construct($registry);
