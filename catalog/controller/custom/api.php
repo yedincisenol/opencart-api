@@ -2,7 +2,7 @@
 
 include_once 'admin/model/sale/order.php';
 include_once 'catalog/model/catalog/category.php';
-include_once 'admin/model/localisation/tax_rate.php';
+include_once 'admin/model/localisation/tax_class.php';
 include_once 'catalog/model/account/custom_field.php';
 include_once 'catalog/model/account/customer_group.php';
 include_once 'admin/model/localisation/order_status.php';
@@ -18,7 +18,7 @@ class Controllercustomapi extends Controller
         'data' => [],
         'meta' => []
     ];
-    private string $dbPrefix = DB_PREFIX;
+    private $dbPrefix = DB_PREFIX;
     public function __construct($registry)
     {
         parent::__construct($registry);
@@ -168,7 +168,7 @@ class Controllercustomapi extends Controller
     public function tax()
     {
         if ($this->auth()) {
-            $taxes = (new ModelLocalisationTaxRate($this->registry))->getTaxRates();
+            $taxes = (new ModelLocalisationTaxClass($this->registry))->getTaxClasses();
             $this->setResponseData($taxes);
         }
     }
