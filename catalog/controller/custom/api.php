@@ -423,7 +423,7 @@ class Controllercustomapi extends Controller
         }
 
         if (!empty($data['filter_date_modified'])) {
-            $sql .= " AND DATE(o.date_modified) = DATE('" . $this->db->escape($data['filter_date_modified']) . "')";
+            $sql .= " AND DATE(o.date_modified) >= DATE('" . $this->db->escape($data['filter_date_modified']) . "')";
         }
 
         if (!empty($data['filter_total'])) {
