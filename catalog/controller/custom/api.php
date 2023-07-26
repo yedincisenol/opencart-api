@@ -602,7 +602,6 @@ class Controllercustomapi extends Controller
                 height = '{$height}',
                 length_class_id = '{$lengthClassId}',
                 status = '{$status}',
-                image = '{$this->imageUpload($data['image'], $model)}',
                 tax_class_id = '{$taxClassId}',
                 date_added = NOW(), date_modified = NOW();"
         );
@@ -630,9 +629,7 @@ class Controllercustomapi extends Controller
             }
         }
 
-        $query = $this->getProductQuery($productId);
-
-        $this->setResponseData($query->row);
+        $this->setResponseData($this->getProductQuery($productId));
     }
 
     /**
@@ -666,6 +663,7 @@ class Controllercustomapi extends Controller
         $metaDescription    = $this->db->escape($data['meta_description'] ?? null);
         $metaKeyword        = $this->db->escape($data['meta_keyword'] ?? null);
         $categoryId         = $this->db->escape($data['category_id'] ?? null);
+
         $this->db->query(
             "UPDATE {$this->dbPrefix}product SET model = '{$this->db->escape($model)}',
                 sku = '{$this->db->escape($sku)}',
@@ -679,7 +677,6 @@ class Controllercustomapi extends Controller
                 height = '{$height}',
                 length_class_id = '{$lengthClassId}',
                 status = '{$status}',
-                image = '{$this->imageUpload($data['image'], $model)}',
                 tax_class_id = '{$taxClassId}',
                 date_modified = NOW() WHERE product_id = '{$productId}';"
         );
@@ -700,36 +697,79 @@ class Controllercustomapi extends Controller
 
         $this->db->query("INSERT INTO {$this->dbPrefix}product_to_category SET product_id = '{$productId}', category_id = '{$categoryId}';");
 
-        $this->db->query("DELETE FROM {$this->dbPrefix}product_image WHERE product_id = '{$productId}';");
-
-        foreach ($data['product_images'] ?? [] as $product_image) {
-            if ($path = $this->imageUpload($product_image, $model)) {
-                $this->db->query("INSERT INTO {$this->dbPrefix}product_image SET product_id = '{$productId} ', image = '{$this->db->escape($path)}';");
-            }
-        }
-
-        $query = $this->getProductQuery($productId);
-
-        $this->setResponseData($query->row);
+        $this->setResponseData($this->getProductQuery($productId));
     }
 
     /**
      * Image Upload
      */
-    public function imageUpload($url, $model): ?string
+    public function imageUpload()
     {
+        if (!$this->auth()) {
+            return false;
+        }
+        $data = $this->request->post;
+        $url = $data['url'];
+        $productId = $data['product_id'];
+        $order = $data['sort_order'];
+
         $image = file_get_contents($url);
         if (empty($image) || !$url) {
             return null;
         }
         $filename = basename($url);
 
-        if (!is_dir(DIR_IMAGE . 'catalog/' . $model)) {
-            mkdir(DIR_IMAGE . 'catalog/' . $model, 0700);
+        if (!is_dir(DIR_IMAGE . 'catalog/' . $productId)) {
+            mkdir(DIR_IMAGE . 'catalog/' . $productId, 0700);
         }
-        file_put_contents(DIR_IMAGE . 'catalog/' . $model . '/' . $filename, file_get_contents($url));
-        return 'catalog/' . $model . '/' . $filename;
+        file_put_contents(DIR_IMAGE . 'catalog/' . $productId . '/' . $filename, file_get_contents($url));
 
+        $path = 'catalog/' . $productId . '/' . $filename;
+
+        if ($order == 1) {
+            $this->db->query(
+                "UPDATE {$this->dbPrefix}product SET
+                    image = '{$this->db->escape($path)}',
+                    date_modified = NOW() WHERE product_id = '{$productId}';"
+            );
+        } else {
+            $this->db->query(
+                "INSERT INTO {$this->dbPrefix}product_image SET 
+                product_id = '{$productId} ',
+                image = '{$this->db->escape($path)}',
+                sort_order = {$order};"
+            );
+        }
+
+        $this->setResponseData(
+            [
+                'path' => $path,
+                'product_id' => $productId
+            ]
+        );
+    }
+
+    public function updateProductImages()
+    {
+        $data = $this->request->post;
+        $productId = $data['product_id'];
+
+        $this->db->query("DELETE FROM {$this->dbPrefix}product_image WHERE product_id = '{$productId}';");
+        foreach ($data['images'] ?? [] as $key => $image) {
+            if ($key == 0) {
+                $this->db->query(
+                    "UPDATE {$this->dbPrefix}product SET
+                    image = '{$this->db->escape($image['path'])}',
+                    date_modified = NOW() WHERE product_id = '{$productId}';"
+                );
+            } else {
+                $this->db->query(
+                    "INSERT INTO {$this->dbPrefix}product_image SET
+                    product_id = '{$productId}',
+                    image = '{$this->db->escape($image['path'])}',
+                    sort_order = {$image['sort_order']};");
+            }
+        }
     }
 
     public function updateStockAndPrice()
@@ -748,9 +788,7 @@ class Controllercustomapi extends Controller
                  date_modified = NOW() WHERE product_id = '{$productId}';"
         );
 
-        $query = $this->getProductQuery($productId);
-
-        $this->setResponseData($query->row);
+        $this->setResponseData($this->getProductQuery($productId));
     }
 
     /**
@@ -761,16 +799,14 @@ class Controllercustomapi extends Controller
         if ($this->auth()) {
             $productId = $_GET['product_id'];
 
-            $query = $this->getProductQuery($productId);
-
-            $this->setResponseData($query->row);
+            $this->setResponseData($this->getProductQuery($productId));
         }
     }
 
     private function getProductQuery($productId) {
         $languageId = $this->config->get('config_language_id');
 
-        return $this->db->query(
+        $query = $this->db->query(
             "SELECT (select cp.category_id
                         from {$this->dbPrefix}product_to_category ptc2
                                  INNER JOIN {$this->dbPrefix}category_path cp on (cp.category_id = ptc2.category_id)
@@ -784,5 +820,11 @@ class Controllercustomapi extends Controller
                 where p.product_id = '" . $productId . "' 
                 order by pd.name, p.model, p.price, p.quantity, p.status, p.sort_order limit 1"
         );
+
+        $data = $query->row;
+        $images = $this->db->query("SELECT * FROM {$this->dbPrefix}product_image WHERE product_id = $productId");
+        $data['images'] = $images->rows;
+
+        return $data;
     }
 }
