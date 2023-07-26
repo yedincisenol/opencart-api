@@ -348,7 +348,14 @@ class Controllercustomapi extends Controller
                 order by pd.name, p.model, p.price, p.quantity, p.status, p.sort_order
                 limit $start, $limit"
             );
-            $products = $query->rows;
+            $products = [];
+
+            foreach ($query->rows as $row) {
+                $images = $this->db->query("SELECT * FROM {$this->dbPrefix}product_image WHERE product_id = {$row['product_id']}");
+                $row['images'] = $images->rows;
+                $products[] = $row;
+            }
+
             $this->setResponseData($products);
         }
     }
