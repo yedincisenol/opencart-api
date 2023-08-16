@@ -843,6 +843,8 @@ class Controllercustomapi extends Controller
 
         $data = $query->row;
         $images = $this->db->query("SELECT * FROM {$this->dbPrefix}product_image WHERE product_id = $productId");
+        $taxes = (new ModelLocalisationTaxClass($this->registry))->getTaxClasses();
+        $data['tax_rate'] = $this->getTaxRate($taxes, $data['tax_class_id']);
         $data['images'] = $images->rows;
 
         return $data;
