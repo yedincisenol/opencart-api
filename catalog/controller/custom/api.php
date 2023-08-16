@@ -365,12 +365,14 @@ class Controllercustomapi extends Controller
         $taxes = array_filter($taxes, function ($tax) use ($taxClassId) {
             return $tax['tax_class_id'] == $taxClassId;
         });
+        if (count($taxes) < 1) {
+            return null;
+        }
         $tax = reset($taxes);
 
-        preg_match('/%(\d+)/', $tax['title'], $match);
-        preg_match('/(\d+)%/', $tax['title'], $match1);
+        preg_match('/(\d+)%|%(\d+)/', $tax['title'], $match);
 
-        return $match[1] ?? ($match1[1] ?? null);
+        return array_pop($match);
     }
 
     /**
