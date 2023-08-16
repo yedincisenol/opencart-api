@@ -349,15 +349,28 @@ class Controllercustomapi extends Controller
                 limit $start, $limit"
             );
             $products = [];
-
+            $taxes = (new ModelLocalisationTaxClass($this->registry))->getTaxClasses();
             foreach ($query->rows as $row) {
                 $images = $this->db->query("SELECT * FROM {$this->dbPrefix}product_image WHERE product_id = {$row['product_id']}");
                 $row['images'] = $images->rows;
+                $row['tax_rate'] = $this->getTaxRate($taxes, $row['tax_class_id']);
                 $products[] = $row;
             }
 
             $this->setResponseData($products);
         }
+    }
+
+    private function getTaxRate($taxes, $taxClassId) {
+        $taxes = array_filter($taxes, function ($tax) use ($taxClassId) {
+            return $tax['tax_class_id'] == $taxClassId;
+        });
+        $tax = reset($taxes);
+
+        preg_match('/%(\d+)/', $tax['title'], $match);
+        preg_match('/(\d+)%/', $tax['title'], $match1);
+
+        return $match[1] ?? ($match1[1] ?? null);
     }
 
     /**
