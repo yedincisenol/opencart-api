@@ -353,6 +353,22 @@ class Controllercustomapi extends Controller
             foreach ($query->rows as $row) {
                 $images = $this->db->query("SELECT * FROM {$this->dbPrefix}product_image WHERE product_id = {$row['product_id']}");
                 $row['images'] = $images->rows;
+                $options = $this->db->query(
+                    "SELECT opv.option_id,
+                       opv.option_value_id,
+                       opv.price_prefix,
+                       opv.price,
+                       opv.quantity,
+                       opv.subtract,
+                       ovd.name as option_value_label,
+                       od.name  as option_label
+                    FROM {$this->dbPrefix}product_option_value as opv
+                             left join {$this->dbPrefix}option_value_description ovd on opv.option_value_id = ovd.option_value_id
+                             left join {$this->dbPrefix}option_description od on opv.option_id = od.option_id
+                    WHERE opv.product_id = {$row['product_id']}
+                      and ovd.language_id = {$languageId}"
+                );
+                $row['options'] = $options->rows;
                 $row['tax_rate'] = $this->getTaxRate($taxes, $row['tax_class_id']);
                 $products[] = $row;
             }
