@@ -366,7 +366,7 @@ class Controllercustomapi extends Controller
                              left join {$this->dbPrefix}option_value_description ovd on opv.option_value_id = ovd.option_value_id
                              left join {$this->dbPrefix}option_description od on opv.option_id = od.option_id
                     WHERE opv.product_id = {$row['product_id']}
-                      and ovd.language_id = {$languageId}"
+                      and ovd.language_id = {$languageId} LIMIT 50"
                 );
                 $row['options'] = $options->rows;
                 $row['tax_rate'] = $this->getTaxRate($taxes, $row['tax_class_id']);
