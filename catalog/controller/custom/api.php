@@ -356,6 +356,7 @@ class Controllercustomapi extends Controller
                 $options = $this->db->query(
                     "SELECT opv.option_id,
                        opv.option_value_id,
+                       opv.product_option_value_id,
                        opv.price_prefix,
                        opv.price,
                        opv.quantity,
@@ -363,8 +364,8 @@ class Controllercustomapi extends Controller
                        ovd.name as option_value_label,
                        od.name  as option_label
                     FROM {$this->dbPrefix}product_option_value as opv
-                             left join {$this->dbPrefix}option_value_description ovd on opv.option_value_id = ovd.option_value_id
-                             left join {$this->dbPrefix}option_description od on opv.option_id = od.option_id
+                             inner join {$this->dbPrefix}option_value_description ovd on opv.option_value_id = ovd.option_value_id
+                             inner join {$this->dbPrefix}option_description od on opv.option_id = od.option_id
                     WHERE opv.product_id = {$row['product_id']}
                       and ovd.language_id = {$languageId} LIMIT 50"
                 );
@@ -864,7 +865,41 @@ class Controllercustomapi extends Controller
         $taxes = (new ModelLocalisationTaxClass($this->registry))->getTaxClasses();
         $data['tax_rate'] = $this->getTaxRate($taxes, $data['tax_class_id']);
         $data['images'] = $images->rows;
+        $options = $this->db->query(
+            "SELECT opv.option_id,
+                       opv.option_value_id,
+                       opv.product_option_value_id,
+                       opv.price_prefix,
+                       opv.price,
+                       opv.quantity,
+                       opv.subtract,
+                       ovd.name as option_value_label,
+                       od.name  as option_label
+                    FROM {$this->dbPrefix}product_option_value as opv
+                             inner join {$this->dbPrefix}option_value_description ovd on opv.option_value_id = ovd.option_value_id
+                             inner join {$this->dbPrefix}option_description od on opv.option_id = od.option_id
+                    WHERE opv.product_id = {$productId}
+                      and ovd.language_id = {$languageId} LIMIT 50"
+        );
+        $data['options'] = $options->rows;
 
         return $data;
+    }
+
+    public function updateProductOption()
+    {
+        if (!$this->auth()) {
+            return false;
+        }
+        $data = $this->request->post;
+
+        $this->db->query(
+            "UPDATE  {$this->dbPrefix}product_option_value SET 
+                 quantity = '{$data['quantity']}',
+                 price = '{$data['price']}',
+                 price_prefix = '{$data['price_prefix']}',
+                 subtract = '1'
+                 WHERE product_option_value_id = '{$_GET['product_option_value_id']}';"
+        );
     }
 }
