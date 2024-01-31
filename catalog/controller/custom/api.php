@@ -886,7 +886,22 @@ class Controllercustomapi extends Controller
         return $data;
     }
 
-    public function updateProductOption()
+    public function updateProductOptionPrice()
+    {
+        if (!$this->auth()) {
+            return false;
+        }
+        $data = $this->request->post;
+
+        $this->db->query(
+            "UPDATE  {$this->dbPrefix}product_option_value SET 
+                 price = '{$data['price']}',
+                 price_prefix = '{$data['price_prefix']}'
+                 WHERE product_option_value_id = '{$_GET['product_option_value_id']}';"
+        );
+    }
+
+    public function updateProductOptionQuantity()
     {
         if (!$this->auth()) {
             return false;
@@ -896,8 +911,6 @@ class Controllercustomapi extends Controller
         $this->db->query(
             "UPDATE  {$this->dbPrefix}product_option_value SET 
                  quantity = '{$data['quantity']}',
-                 price = '{$data['price']}',
-                 price_prefix = '{$data['price_prefix']}',
                  subtract = '1'
                  WHERE product_option_value_id = '{$_GET['product_option_value_id']}';"
         );
