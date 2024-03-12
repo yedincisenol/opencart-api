@@ -1,7 +1,6 @@
 <?php
 
 include_once 'admin/model/sale/order.php';
-include_once 'catalog/model/catalog/category.php';
 include_once 'admin/model/localisation/tax_class.php';
 include_once 'catalog/model/account/custom_field.php';
 include_once 'catalog/model/account/customer_group.php';
