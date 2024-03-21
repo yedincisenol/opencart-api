@@ -185,7 +185,11 @@ class Controllercustomapi extends Controller
                 $aorder['custom_field'] = $this->decode($aorder['custom_field']);
                 $aorder['payment_custom_field'] = $this->decode($aorder['payment_custom_field']);
                 $aorder['customer_custom_field'] = $this->decode($aorder['customer_custom_field']);
-                $aorder['products'] = $order->getOrderProducts($aorder['order_id']);
+                $aorder['products'] = array_map(function ($product) use ($order) {
+                    $aproduct = $product;
+                    $aproduct['options'] = $order->getOrderOptions($product['order_id'], $product['order_product_id']);
+                    return $aproduct;
+                }, $order->getOrderProducts($aorder['order_id']));
                 $aorder['totals'] = $this->getOrderTotals($aorder['order_id'], $aorder['shipping_code'], $aorder['payment_country_id']);
                 return $aorder;
             }, $orders);
@@ -818,13 +822,19 @@ class Controllercustomapi extends Controller
 
         $productId = $_GET['product_id'];
         $data = $this->request->post;
-        $this->db->query(
-            "UPDATE  {$this->dbPrefix}product SET 
-                 quantity = '{$data['quantity']}',
-                 price = '{$data['price']}',
-                 status = '{$data['status']}',
-                 date_modified = NOW() WHERE product_id = '{$productId}';"
-        );
+        $sql = "UPDATE  {$this->dbPrefix}product SET ";
+        if (isset($data['quantity'])) {
+            $sql .= "quantity = '{$data['quantity']}',";
+        }
+        if (isset($data['price'])) {
+            $sql .= " price = '{$data['price']}',";
+        }
+        if (isset($data['status'])) {
+            $sql .= " status = '{$data['status']}',";
+        }
+
+        $sql .= "date_modified = NOW() WHERE product_id = '{$productId}';";
+        $this->db->query($sql);
 
         $this->setResponseData($this->getProductQuery($productId));
     }
