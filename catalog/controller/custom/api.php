@@ -336,6 +336,11 @@ class Controllercustomapi extends Controller
             $start = ($page - 1) * $limit;
             $languageId = $this->config->get('config_language_id');
             $prefix = $this->dbPrefix;
+            $stockCode = $_GET['sku'] ?? null;
+            $queryWhere = '';
+            if ($stockCode) {
+                $queryWhere = " where sku ='$stockCode'";
+            }
             // get products
             $query = $this->db->query(
                 "SELECT (select cp.category_id
@@ -348,6 +353,7 @@ class Controllercustomapi extends Controller
                         LEFT JOIN {$prefix}manufacturer m ON (p.manufacturer_id = m.manufacturer_id)
                         LEFT JOIN {$prefix}weight_class wc on (p.weight_class_id = wc.weight_class_id)
                         LEFT JOIN {$prefix}weight_class_description wcd on (wc.weight_class_id = wcd.weight_class_id)
+                $queryWhere
                 order by pd.name, p.model, p.price, p.quantity, p.status, p.sort_order
                 limit $start, $limit"
             );
