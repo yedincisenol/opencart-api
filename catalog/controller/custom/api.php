@@ -552,7 +552,7 @@ class Controllercustomapi extends Controller
         $request = json_decode(file_get_contents('php://input'), true);
         $orderId = $request['order_id'];
         $orderStatusId = $request['order_status_id'];
-        (new ModelCheckoutOrder($this->registry))->addOrderHistory($orderId, $orderStatusId);
+        (new ModelCheckoutOrder($this->registry))->addOrderHistory($orderId, $orderStatusId, '', true);
     }
 
     /**
