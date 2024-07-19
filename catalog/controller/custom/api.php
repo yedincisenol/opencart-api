@@ -693,9 +693,7 @@ class Controllercustomapi extends Controller
 
         $model              = $this->db->escape($data['model']);
         $sku                = $this->db->escape($data['sku']) ?? null;
-        $quantity           = $data['quantity'] ?? null;
         $manufacturerId     = $data['manufacturer_id'] ?? null;
-        $price              = $data['price'] ?? null;
         $weight             = $data['weight'] ?? null;
         $weightClassId      = $data['weight_class_id'] ?? null;
         $length             = $data['length'] ?? null;
@@ -715,9 +713,7 @@ class Controllercustomapi extends Controller
         $this->db->query(
             "UPDATE {$this->dbPrefix}product SET model = '{$this->db->escape($model)}',
                 sku = '{$this->db->escape($sku)}',
-                quantity = '{$quantity}',
                 manufacturer_id = '{$manufacturerId}',
-                price = '{$price}',
                 weight = '{$weight}',
                 weight_class_id = '{$weightClassId}',
                 length = '{$length}',
