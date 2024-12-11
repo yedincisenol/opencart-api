@@ -930,29 +930,18 @@ class Controllercustomapi extends Controller
     public function currencies()
     {
         if ($this->auth()) {
-            $query = $this->db->query(
-                "SELECT currency_id, title, code, symbol_left, symbol_right, value, status 
-             FROM {$this->dbPrefix}currency 
-             WHERE status = '1'"
-            );
-
-            $this->setResponseData($query->rows);
-        }
-    }
-
-    public function defaultcurrency()
-    {
-        if ($this->auth()) {
             $defaultCurrencyCode = $this->config->get('config_currency');
+
             $query = $this->db->query(
                 "SELECT currency_id, title, code, symbol_left, symbol_right, value, status 
-             FROM {$this->dbPrefix}currency 
-             WHERE code = '" . $this->db->escape($defaultCurrencyCode) . "'"
+             FROM {$this->dbPrefix}currency"
             );
+            $currencies = array_map(function ($currency) use ($defaultCurrencyCode) {
+                $currency['is_default'] = ($currency['code'] === $defaultCurrencyCode) ? true : false;
+                return $currency;
+            }, $query->rows);
 
-            $this->setResponseData($query->row);
-
+            $this->setResponseData($currencies);
         }
     }
-
 }
