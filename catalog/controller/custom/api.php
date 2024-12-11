@@ -926,4 +926,33 @@ class Controllercustomapi extends Controller
                  WHERE product_option_value_id = '{$_GET['product_option_value_id']}';"
         );
     }
+
+    public function currencies()
+    {
+        if ($this->auth()) {
+            $query = $this->db->query(
+                "SELECT currency_id, title, code, symbol_left, symbol_right, value, status 
+             FROM {$this->dbPrefix}currency 
+             WHERE status = '1'"
+            );
+
+            $this->setResponseData($query->rows);
+        }
+    }
+
+    public function defaultcurrency()
+    {
+        if ($this->auth()) {
+            $defaultCurrencyCode = $this->config->get('config_currency');
+            $query = $this->db->query(
+                "SELECT currency_id, title, code, symbol_left, symbol_right, value, status 
+             FROM {$this->dbPrefix}currency 
+             WHERE code = '" . $this->db->escape($defaultCurrencyCode) . "'"
+            );
+
+            $this->setResponseData($query->row);
+
+        }
+    }
+
 }
