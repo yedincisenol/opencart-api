@@ -191,6 +191,7 @@ class Controllercustomapi extends Controller
                     return $aproduct;
                 }, $order->getOrderProducts($aorder['order_id']));
                 $aorder['totals'] = $this->getOrderTotals($aorder['order_id'], $aorder['shipping_code'], $aorder['payment_country_id']);
+                $aorder['coupon'] = $this->getOrderCoupon($aorder['order_id']);
                 return $aorder;
             }, $orders);
             $this->setResponseData($orders);
@@ -303,6 +304,15 @@ class Controllercustomapi extends Controller
         }, $query->rows);
 
         return $totals;
+    }
+
+    private function getOrderCoupon($order_id)
+    {
+        $query = $this->db->query('SELECT * FROM oc_coupon_history ch
+                JOIN oc_coupon c ON ch.coupon_id = c.coupon_id
+                WHERE ch.order_id = '. $order_id );
+
+        return $query->rows;
     }
 
     /**
