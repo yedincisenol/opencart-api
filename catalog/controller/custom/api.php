@@ -955,12 +955,11 @@ class Controllercustomapi extends Controller
         }
     }
 
-    public function invoice() {
+    public function setOrderInvoice() {
         if (!$this->auth()) {
             return false;
         }
 
-        // Gerekli parametreleri kontrol et
         if (empty($this->request->post['order_id']) || empty($this->request->post['invoice_url'])) {
             return $this->error('Eksik parametre(order_id veya invoice_url) gönderildi.');
         }
