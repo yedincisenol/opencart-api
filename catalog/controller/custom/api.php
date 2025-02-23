@@ -969,22 +969,21 @@ class Controllercustomapi extends Controller
         $order_id = $this->request->post['order_id'];
         $invoice_url = $this->request->post['invoice_url'];
 
-        // Siparişin olup olmadığını kontrol et
+        // Check Order Exists
         $query = $this->db->query("SELECT comment FROM `" . DB_PREFIX . "order` WHERE order_id = '" . $order_id . "'");
-
         if (!$query->num_rows) {
             return $this->error('Sipariş bulunamadı.');
         }
 
         $existing_comment = $query->row['comment'];
 
-        // Önce eski fatura linkini kaldır
+        // Remove old invoice link
         $updated_comment = preg_replace('/<a href="[^"]+" target="_blank">Faturayı indirmek için tıklayın<\/a>/', '', $existing_comment);
 
-        // Yeni tıklanabilir fatura linki ekle
+        // Add invoice link
         $new_comment = trim($updated_comment . ' <a href="' . $invoice_url . '" target="_blank">Faturayı indirmek için tıklayın.</a>');
 
-        // Veritabanını güncelle
+        // Update comment with invoice link
         $this->db->query("UPDATE `" . DB_PREFIX . "order` SET comment = '" . $this->db->escape($new_comment) . "' WHERE order_id = '" . (int)$order_id . "'");
 
         return true;
