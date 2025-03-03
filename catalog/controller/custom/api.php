@@ -624,7 +624,7 @@ class Controllercustomapi extends Controller
         $data = $this->request->post;
 
         if(!$data['model'] || !$data['name'] || !$data['meta_title']) {
-            return $this->error('Model, ürün başlığı ve seo başlık zorunlu alan');
+            return $this->error('Model, product title, and SEO title are required fields.');
         }
         $model              = $this->db->escape($data['model']);
         $sku                = $this->db->escape($data['sku'] ?? null);
@@ -961,7 +961,7 @@ class Controllercustomapi extends Controller
         }
 
         if (empty($this->request->post['order_id']) || empty($this->request->post['invoice_url'])) {
-            return $this->error('Eksik parametre(order_id veya invoice_url) gönderildi.');
+            return $this->error('Missing parameter (order_id or invoice_url) was sent.');
         }
 
         $this->load->model('checkout/order');
@@ -972,7 +972,7 @@ class Controllercustomapi extends Controller
         // Check Order Exists
         $query = $this->db->query("SELECT comment FROM `" . DB_PREFIX . "order` WHERE order_id = '" . $order_id . "'");
         if (!$query->num_rows) {
-            return $this->error('Sipariş bulunamadı.');
+            return $this->error('Order not found.');
         }
 
         $existing_comment = $query->row['comment'];
