@@ -624,7 +624,7 @@ class Controllercustomapi extends Controller
         $data = $this->request->post;
 
         if(!$data['model'] || !$data['name'] || !$data['meta_title']) {
-            return $this->error('Model, ürün başlığı ve seo başlık zorunlu alan');
+            return $this->error('Model, product title, and SEO title are required fields.');
         }
         $model              = $this->db->escape($data['model']);
         $sku                = $this->db->escape($data['sku'] ?? null);
@@ -953,5 +953,39 @@ class Controllercustomapi extends Controller
 
             $this->setResponseData($currencies);
         }
+    }
+
+    public function setOrderInvoice() {
+        if (!$this->auth()) {
+            return false;
+        }
+
+        if (empty($this->request->post['order_id']) || empty($this->request->post['invoice_url'])) {
+            return $this->error('Missing parameter (order_id or invoice_url) was sent.');
+        }
+
+        $this->load->model('checkout/order');
+
+        $order_id = $this->request->post['order_id'];
+        $invoice_url = $this->request->post['invoice_url'];
+
+        // Check Order Exists
+        $query = $this->db->query("SELECT comment FROM `" . DB_PREFIX . "order` WHERE order_id = '" . $order_id . "'");
+        if (!$query->num_rows) {
+            return $this->error('Order not found.');
+        }
+
+        $existing_comment = $query->row['comment'];
+
+        // Remove old invoice link
+        $updated_comment = preg_replace('/<a href="[^"]+" target="_blank">Faturayı indirmek için tıklayın<\/a>/', '', $existing_comment);
+
+        // Add invoice link
+        $new_comment = trim($updated_comment . ' <a href="' . $invoice_url . '" target="_blank">Faturayı indirmek için tıklayın.</a>');
+
+        // Update comment with invoice link
+        $this->db->query("UPDATE `" . DB_PREFIX . "order` SET comment = '" . $this->db->escape($new_comment) . "' WHERE order_id = '" . (int)$order_id . "'");
+
+        return true;
     }
 }
