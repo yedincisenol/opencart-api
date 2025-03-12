@@ -308,9 +308,8 @@ class Controllercustomapi extends Controller
 
     private function getOrderCoupon($order_id)
     {
-        $query = $this->db->query('SELECT * FROM oc_coupon_history ch
-                JOIN oc_coupon c ON ch.coupon_id = c.coupon_id
-                WHERE ch.order_id = '. $order_id );
+        $prefix = DB_PREFIX;
+        $query = $this->db->query("SELECT * FROM {$prefix}coupon_history ch JOIN {$prefix}coupon c ON ch.coupon_id = c.coupon_id WHERE ch.order_id = {$order_id}");
 
         return $query->rows;
     }
