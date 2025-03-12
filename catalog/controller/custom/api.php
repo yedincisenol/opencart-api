@@ -341,9 +341,6 @@ class Controllercustomapi extends Controller
     public function product()
     {
         if ($this->auth()) {
-            $page = isset($_GET['page']) ? $_GET['page'] : 1;
-            $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : self::limit;
-            $start = ($page - 1) * $limit;
             $languageId = $this->config->get('config_language_id');
             $prefix = $this->dbPrefix;
             $stockCode = $_GET['sku'] ?? null;
@@ -364,12 +361,12 @@ class Controllercustomapi extends Controller
                         LEFT JOIN {$prefix}weight_class wc on (p.weight_class_id = wc.weight_class_id)
                         LEFT JOIN {$prefix}weight_class_description wcd on (wc.weight_class_id = wcd.weight_class_id)
                 $queryWhere
-                order by pd.name, p.model, p.price, p.quantity, p.status, p.sort_order
-                limit $start, $limit"
+                order by pd.name, p.model, p.price, p.quantity, p.status, p.sort_order"
             );
+            $productRows = $this->paginate($query->rows);
             $products = [];
             $taxes = (new ModelLocalisationTaxClass($this->registry))->getTaxClasses();
-            foreach ($query->rows as $row) {
+            foreach ($productRows as $row) {
                 $images = $this->db->query("SELECT * FROM {$this->dbPrefix}product_image WHERE product_id = {$row['product_id']}");
                 $row['images'] = $images->rows;
                 $options = $this->db->query(
