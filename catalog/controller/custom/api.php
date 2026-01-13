@@ -153,7 +153,7 @@ class Api extends Controller
         return false;
     }
 
-    private function response(): void
+    private function response(?array $data = null): void
     {
         if (isset($this->request->server['HTTP_ORIGIN'])) {
             $this->response->addHeader('Access-Control-Allow-Origin: ' . $this->request->server['HTTP_ORIGIN']);
@@ -162,16 +162,17 @@ class Api extends Controller
             $this->response->addHeader('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
         }
 
+        if ($data !== null) {
+            $this->data['data'] = $data;
+        }
+
         $this->response->addHeader('X-Opencart-Version: ' . VERSION);
         $this->response->addHeader('Content-Type: application/json');
 
         $this->response->setOutput(json_encode($this->data));
     }
 
-    private function setResponseData(array $data): void
-    {
-        $this->data['data'] = $data;
-    }
+
 
     private function paginate(array $results, ?int $page = null, ?int $limit = null): array
     {
@@ -288,8 +289,7 @@ class Api extends Controller
 
             $query = $this->db->query($sql);
             $categories = $this->paginate($query->rows);
-            $this->setResponseData($categories);
-            $this->response();
+            $this->response($categories);
         }
     }
 
@@ -305,8 +305,7 @@ class Api extends Controller
 
             $query = $this->db->query($sql);
             $manufacturers = $this->paginate($query->rows);
-            $this->setResponseData($manufacturers);
-            $this->response();
+            $this->response($manufacturers);
         }
     }
 
@@ -319,7 +318,8 @@ class Api extends Controller
             $model = $this->loadAdminModel('localisation/tax_class');
             if ($model) {
                 $taxes = $model->getTaxClasses();
-                $this->setResponseData($taxes);
+                $this->response($taxes);
+                return;
             }
             $this->response();
         }
@@ -334,8 +334,7 @@ class Api extends Controller
                     LEFT JOIN {$this->dbPrefix}length_class_description lcd ON lc.length_class_id = lcd.length_class_id
                     WHERE lcd.language_id = {$languageId}";
             $query = $this->db->query($sql);
-            $this->setResponseData($query->rows);
-            $this->response();
+            $this->response($query->rows);
         }
     }
 
@@ -349,8 +348,7 @@ class Api extends Controller
                     WHERE wd.language_id = {$languageId}";
 
             $query = $this->db->query($sql);
-            $this->setResponseData($query->rows);
-            $this->response();
+            $this->response($query->rows);
         }
     }
 
@@ -368,8 +366,7 @@ class Api extends Controller
                 return $currency;
             }, $query->rows);
 
-            $this->setResponseData($currencies);
-            $this->response();
+            $this->response($currencies);
         }
     }
 
@@ -385,8 +382,8 @@ class Api extends Controller
             $data['customer_groups'] = $this->getCustomerGroup();
             $data['order_statuses'] = $this->model_localisation_order_status->getOrderStatuses();
 
-            $this->setResponseData($data);
-            $this->response();
+
+            $this->response($data);
         }
     }
 
@@ -470,8 +467,7 @@ class Api extends Controller
                 $products[] = $row;
             }
 
-            $this->setResponseData($products);
-            $this->response();
+            $this->response($products);
         }
     }
 
@@ -479,8 +475,7 @@ class Api extends Controller
     {
         if ($this->auth()) {
             $productId = (int) ($this->request->get['product_id'] ?? 0);
-            $this->setResponseData($this->getProductQuery($productId));
-            $this->response();
+            $this->response($this->getProductQuery($productId));
         }
     }
 
@@ -653,8 +648,7 @@ class Api extends Controller
             }
         }
 
-        $this->setResponseData($this->getProductQuery($productId));
-        $this->response();
+        $this->response($this->getProductQuery($productId));
     }
 
     public function updateProduct(): void
@@ -715,8 +709,7 @@ class Api extends Controller
             }
         }
 
-        $this->setResponseData($this->getProductQuery($productId));
-        $this->response();
+        $this->response($this->getProductQuery($productId));
     }
 
     public function updateStockAndPrice(): void
@@ -739,8 +732,7 @@ class Api extends Controller
             $this->db->query("UPDATE {$this->dbPrefix}product SET {$setClause}, date_modified = NOW() WHERE product_id = '{$productId}'");
         }
 
-        $this->setResponseData($this->getProductQuery($productId));
-        $this->response();
+        $this->response($this->getProductQuery($productId));
     }
 
     public function updateProductOptionPrice(): void
@@ -808,11 +800,11 @@ class Api extends Controller
                 );
             }
 
-            $this->setResponseData([
+
+            $this->response([
                 'path' => $path,
                 'product_id' => $productId
             ]);
-            $this->response();
         }
     }
 
@@ -910,8 +902,8 @@ class Api extends Controller
                 return $orderResult;
             }, $orders);
 
-            $this->setResponseData($orders);
-            $this->response();
+
+            $this->response($orders);
         }
     }
 
@@ -1064,8 +1056,8 @@ class Api extends Controller
                 $this->model_checkout_order->addHistory($orderId, $orderStatusId, '', true);
             }
         }
-        $this->setResponseData([]);
-        $this->response();
+
+        $this->response([]);
     }
 
     public function setOrderInvoice(): void
@@ -1106,7 +1098,6 @@ class Api extends Controller
              WHERE order_id = '{$orderId}'"
         );
 
-        $this->setResponseData(['success' => true]);
-        $this->response();
+        $this->response(['success' => true]);
     }
 }
