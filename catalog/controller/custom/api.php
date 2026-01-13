@@ -1,13 +1,11 @@
 <?php
 
-include_once 'admin/model/sale/order.php';
-include_once 'admin/model/localisation/tax_class.php';
-include_once 'catalog/model/account/custom_field.php';
-include_once 'catalog/model/account/customer_group.php';
-include_once 'admin/model/localisation/order_status.php';
-include_once 'catalog/model/checkout/order.php';
+namespace Opencart\catalog\controller\custom;
 
-class Controllercustomapi extends Controller
+use Exception;
+use Opencart\System\Engine\Controller;
+
+class Api extends Controller
 {
     const limit = 15;
 
@@ -122,6 +120,7 @@ class Controllercustomapi extends Controller
         unset($this->data['data'], $this->data['meta']);
 
         $this->data = $json;
+        $this->response();
     }
 
     /**
@@ -148,9 +147,11 @@ class Controllercustomapi extends Controller
     public function customeroption()
     {
         if ($this->auth()) {
-            $data['custom_fields'] = (new ModelAccountCustomField($this->registry))->getCustomFields();
+            $this->load->model('account/custom_field');
+            $this->load->model('localisation/order_status');
+            $data['custom_fields'] = $this->model_account_custom_field->getCustomFields();
             $data['customer_groups'] = $this->getCustomerGroup();
-            $data['order_statuses'] = (new ModelLocalisationOrderStatus($this->registry))->getOrderStatuses();
+            $data['order_statuses'] = $this->model_localisation_order_status->getOrderStatuses();
 
             $this->setResponseData($data);
         }
@@ -158,7 +159,8 @@ class Controllercustomapi extends Controller
 
     public function getCustomerGroup()
     {
-        return (new ModelAccountCustomerGroup($this->registry))->getCustomerGroups();
+        $this->load->model('account/customer_group');
+        return $this->model_account_customer_group->getCustomerGroups();
     }
 
     /**
@@ -167,7 +169,8 @@ class Controllercustomapi extends Controller
     public function tax()
     {
         if ($this->auth()) {
-            $taxes = (new ModelLocalisationTaxClass($this->registry))->getTaxClasses();
+            $model = $this->loadAdminModel('localisation/tax_class');
+            $taxes = $model->getTaxClasses();
             $this->setResponseData($taxes);
         }
     }
@@ -178,8 +181,8 @@ class Controllercustomapi extends Controller
     public function order()
     {
         if ($this->auth()) {
-            $order = new ModelSaleOrder($this->registry);
-            $orders = $this->getOrders($_GET);
+            $order = $this->loadAdminModel('sale/order');
+            $orders = $this->getOrders($this->request->get);
             $orders = $this->paginate($orders);
             $orders = array_map(function ($aorder) use ($order) {
                 $aorder['custom_field'] = $this->decode($aorder['custom_field']);
@@ -187,9 +190,13 @@ class Controllercustomapi extends Controller
                 $aorder['customer_custom_field'] = $this->decode($aorder['customer_custom_field']);
                 $aorder['products'] = array_map(function ($product) use ($order) {
                     $aproduct = $product;
-                    $aproduct['options'] = $order->getOrderOptions($product['order_id'], $product['order_product_id']);
+                    if (method_exists($order, 'getOptions')) {
+                        $aproduct['options'] = $order->getOptions($product['order_id'], $product['order_product_id']);
+                    } else {
+                        $aproduct['options'] = $order->getOrderOptions($product['order_id'], $product['order_product_id']);
+                    }
                     return $aproduct;
-                }, $order->getOrderProducts($aorder['order_id']));
+                }, $order->getProducts($aorder['order_id']));
                 $aorder['totals'] = $this->getOrderTotals($aorder['order_id'], $aorder['shipping_code'], $aorder['payment_country_id']);
                 $aorder['coupon'] = $this->getOrderCoupon($aorder['order_id']);
                 return $aorder;
@@ -364,7 +371,8 @@ class Controllercustomapi extends Controller
             );
             $productRows = $this->paginate($query->rows);
             $products = [];
-            $taxes = (new ModelLocalisationTaxClass($this->registry))->getTaxClasses();
+            $model_tax = $this->loadAdminModel('localisation/tax_class');
+            $taxes = $model_tax ? $model_tax->getTaxClasses() : [];
             foreach ($productRows as $row) {
                 $images = $this->db->query("SELECT * FROM {$this->dbPrefix}product_image WHERE product_id = {$row['product_id']}");
                 $row['images'] = $images->rows;
@@ -415,6 +423,8 @@ class Controllercustomapi extends Controller
     private function setResponseData($data)
     {
         $this->data['data'] = $data;
+
+        $this->response();
     }
 
     /**
@@ -428,7 +438,9 @@ class Controllercustomapi extends Controller
      */
     private function paginate($results, $page = null, $limit = null)
     {
-        if ($page == null) $page = max(@$_GET['page'], 1);
+        if ($page == null) {
+            $page = max(isset($_GET['page']) ?? $_GET['page'], 1);
+        }
         if ($limit == null) $limit = isset($_GET['limit']) ? $_GET['limit'] : self::limit;
 
         $paginate['total'] = count($results);
@@ -507,7 +519,25 @@ class Controllercustomapi extends Controller
 
         $query = $this->db->query($sql);
 
-        return $query->rows;
+        $results = [];
+        foreach ($query->rows as $row) {
+            $shippingMethod = json_decode($row['shipping_method'] ?? '', true);
+            $row['shipping_code'] = $shippingMethod['code'] ?? '';
+            $row['shipping_method'] = $shippingMethod['name'] ?? '';
+
+            $paymentMethod = json_decode($row['payment_method'] ?? '', true);
+            $row['payment_code'] = $paymentMethod['code'] ?? '';
+            $row['payment_method'] = $paymentMethod['name'] ?? '';
+
+            if (empty($row['payment_firstname'])) {
+                $row['payment_firstname'] = $row['shipping_firstname'];
+                $row['payment_lastname'] = $row['shipping_lastname'];
+            }
+
+            $results[] = $row;
+        }
+
+        return $results;
     }
 
     /**
@@ -558,7 +588,8 @@ class Controllercustomapi extends Controller
         $request = json_decode(file_get_contents('php://input'), true);
         $orderId = $request['order_id'];
         $orderStatusId = $request['order_status_id'];
-        (new ModelCheckoutOrder($this->registry))->addOrderHistory($orderId, $orderStatusId, '', true);
+        $this->load->model('checkout/order');
+        $this->model_checkout_order->addHistory($orderId, $orderStatusId, '', true);
     }
 
     /**
@@ -753,12 +784,15 @@ class Controllercustomapi extends Controller
     /**
      * Image Upload
      */
-    public function imageUpload()
+    public function imageUpload($product_image = null, $model = null)
     {
         if (!$this->auth()) {
             return false;
         }
         $data = $this->request->post;
+        if ($product_image) {
+            $data['url'] = $product_image;
+        }
         $url = $data['url'];
         $productId = $data['product_id'];
         $order = $data['sort_order'];
@@ -879,7 +913,8 @@ class Controllercustomapi extends Controller
 
         $data = $query->row;
         $images = $this->db->query("SELECT * FROM {$this->dbPrefix}product_image WHERE product_id = $productId");
-        $taxes = (new ModelLocalisationTaxClass($this->registry))->getTaxClasses();
+        $model_tax = $this->loadAdminModel('localisation/tax_class');
+        $taxes = $model_tax ? $model_tax->getTaxClasses() : [];
         $data['tax_rate'] = $this->getTaxRate($taxes, $data['tax_class_id']);
         $data['images'] = $images->rows;
         $options = $this->db->query(
@@ -974,7 +1009,7 @@ class Controllercustomapi extends Controller
         $existing_comment = $query->row['comment'];
 
         // Remove old invoice link
-        $updated_comment = preg_replace('/<a href="[^"]+" target="_blank">Faturayı indirmek için tıklayın<\/a>/', '', $existing_comment);
+        $updated_comment = preg_replace('/<a href="[^" ]+" target="_blank">Faturayı indirmek için tıklayın<\/a>/', '', $existing_comment);
 
         // Add invoice link
         $new_comment = trim($updated_comment . ' <a href="' . $invoice_url . '" target="_blank">Faturayı indirmek için tıklayın.</a>');
@@ -983,5 +1018,34 @@ class Controllercustomapi extends Controller
         $this->db->query("UPDATE `" . DB_PREFIX . "order` SET comment = '" . $this->db->escape($new_comment) . "' WHERE order_id = '" . (int)$order_id . "'");
 
         return true;
+    }
+
+    /**
+     * Helper to load admin models from catalog side
+     */
+    private function loadAdminModel($route)
+    {
+        $file = DIR_OPENCART . 'admin/model/' . $route . '.php';
+        if (file_exists($file)) {
+            include_once($file);
+
+            $parts = explode('/', $route);
+            $class = 'Opencart\\Admin\\Model';
+            foreach ($parts as $part) {
+                $class .= '\\' . ucfirst(preg_replace('/[^a-zA-Z0-9]/', '', $part));
+            }
+            if (class_exists($class)) {
+                return new $class($this->registry);
+            }
+        }
+        return null;
+    }
+
+    public function __call($name, $arguments)
+    {
+        $method = lcfirst(str_replace(' ', '', ucwords(str_replace(['-', '_'], ' ', $name))));
+        if (method_exists($this, $method)) {
+            return call_user_func_array([$this, $method], $arguments);
+        }
     }
 }
