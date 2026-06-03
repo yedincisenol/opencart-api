@@ -181,13 +181,17 @@ class Controllercustomapi extends Controller
             $order = new ModelSaleOrder($this->registry);
             $orders = $this->getOrders($_GET);
             $orders = $this->paginate($orders);
-            $orders = array_map(function ($aorder) use ($order) {
+            $orderIds = array_column($orders, 'order_id');
+            $returnsMap = $this->getReturnsByOrderIds($orderIds);
+
+            $orders = array_map(function ($aorder) use ($order, $returnsMap) {
                 $aorder['custom_field'] = $this->decode($aorder['custom_field']);
                 $aorder['payment_custom_field'] = $this->decode($aorder['payment_custom_field']);
                 $aorder['customer_custom_field'] = $this->decode($aorder['customer_custom_field']);
-                $aorder['products'] = array_map(function ($product) use ($order) {
+                $aorder['products'] = array_map(function ($product) use ($order, $returnsMap) {
                     $aproduct = $product;
                     $aproduct['options'] = $order->getOrderOptions($product['order_id'], $product['order_product_id']);
+                    $aproduct['returns'] = $returnsMap[$product['order_id']][$product['product_id']] ?? [];
                     return $aproduct;
                 }, $order->getOrderProducts($aorder['order_id']));
                 $aorder['totals'] = $this->getOrderTotals($aorder['order_id'], $aorder['shipping_code'], $aorder['payment_country_id']);
@@ -312,6 +316,31 @@ class Controllercustomapi extends Controller
         $query = $this->db->query("SELECT * FROM {$prefix}coupon_history ch JOIN {$prefix}coupon c ON ch.coupon_id = c.coupon_id WHERE ch.order_id = {$order_id}");
 
         return $query->rows;
+    }
+
+    private function getReturnsByOrderIds(array $orderIds)
+    {
+        if (empty($orderIds)) {
+            return [];
+        }
+
+        $prefix = DB_PREFIX;
+        $ids = implode(',', array_map('intval', $orderIds));
+
+        $query = $this->db->query("
+            SELECT return_id, order_id, product_id, product, model, quantity, opened, comment,
+                   return_reason_id, return_action_id, return_status_id,
+                   date_ordered, date_added, date_modified
+            FROM {$prefix}return
+            WHERE order_id IN ({$ids})
+        ");
+
+        $map = [];
+        foreach ($query->rows as $row) {
+            $map[$row['order_id']][$row['product_id']][] = $row;
+        }
+
+        return $map;
     }
 
     /**
@@ -602,6 +631,21 @@ class Controllercustomapi extends Controller
             $sql = "select wd.unit, wd.title, w.weight_class_id from " . DB_PREFIX . "weight_class w
                 left join " . DB_PREFIX . "weight_class_description wd on w.weight_class_id = wd.weight_class_id
             Where wd.language_id = " . (int)$this->config->get('config_language_id');
+
+            $query = $this->db->query($sql);
+            $this->setResponseData($query->rows);
+        }
+    }
+
+    /**
+     * Return Status List
+     */
+    public function productReturnStatus()
+    {
+        if ($this->auth()) {
+            $sql = "SELECT return_status_id, name FROM " . DB_PREFIX . "return_status
+                    WHERE language_id = " . (int)$this->config->get('config_language_id') . "
+                    ORDER BY name ASC";
 
             $query = $this->db->query($sql);
             $this->setResponseData($query->rows);
