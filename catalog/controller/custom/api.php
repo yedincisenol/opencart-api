@@ -878,7 +878,10 @@ class Api extends Controller
             $orders = $this->getOrders($this->request->get);
             $orders = $this->paginate($orders);
 
-            $orders = array_map(function ($orderResult) use ($modelSaleOrder) {
+            $orderIds = array_column($orders, 'order_id');
+            $returnsMap = $this->getReturnsByOrderIds($orderIds);
+
+            $orders = array_map(function ($orderResult) use ($modelSaleOrder, $returnsMap) {
                 $orderResult['custom_field'] = $this->decode($orderResult['custom_field']);
                 $orderResult['payment_custom_field'] = $this->decode($orderResult['payment_custom_field']);
 
@@ -886,7 +889,7 @@ class Api extends Controller
                     $orderResult['customer_custom_field'] = $this->decode($orderResult['customer_custom_field']);
                 }
 
-                $orderResult['products'] = array_map(function ($product) use ($modelSaleOrder, $orderResult) {
+                $orderResult['products'] = array_map(function ($product) use ($modelSaleOrder, $orderResult, $returnsMap) {
                     $productResult = $product;
                     // Check if getOptions exists, else try getOrderOptions (OC version variance)
                     if (method_exists($modelSaleOrder, 'getOptions')) {
@@ -894,6 +897,7 @@ class Api extends Controller
                     } elseif (method_exists($modelSaleOrder, 'getOrderOptions')) {
                         $productResult['options'] = $modelSaleOrder->getOrderOptions($orderResult['order_id'], $product['order_product_id']);
                     }
+                    $productResult['returns'] = $returnsMap[$product['order_id']][$product['product_id']] ?? [];
                     return $productResult;
                 }, $modelSaleOrder->getProducts($orderResult['order_id']));
 
@@ -1099,5 +1103,43 @@ class Api extends Controller
         );
 
         $this->response(['success' => true]);
+    }
+
+    private function getReturnsByOrderIds(array $orderIds): array
+    {
+        if (empty($orderIds)) {
+            return [];
+        }
+
+        $ids = implode(',', array_map('intval', $orderIds));
+
+        $query = $this->db->query("
+            SELECT return_id, order_id, product_id, product, model, quantity, opened, comment,
+                   return_reason_id, return_action_id, return_status_id,
+                   date_ordered, date_added, date_modified
+            FROM {$this->dbPrefix}return
+            WHERE order_id IN ({$ids})
+        ");
+
+        $map = [];
+        foreach ($query->rows as $row) {
+            $map[$row['order_id']][$row['product_id']][] = $row;
+        }
+
+        return $map;
+    }
+
+    public function returnStatus(): void
+    {
+        if ($this->auth()) {
+            $languageId = (int) $this->config->get('config_language_id');
+            $query = $this->db->query(
+                "SELECT return_status_id, name
+                 FROM {$this->dbPrefix}return_status
+                 WHERE language_id = '{$languageId}'
+                 ORDER BY name ASC"
+            );
+            $this->response($query->rows);
+        }
     }
 }
