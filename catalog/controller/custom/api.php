@@ -181,13 +181,17 @@ class Controllercustomapi extends Controller
             $order = new ModelSaleOrder($this->registry);
             $orders = $this->getOrders($_GET);
             $orders = $this->paginate($orders);
-            $orders = array_map(function ($aorder) use ($order) {
+            $orderIds = array_column($orders, 'order_id');
+            $returnsMap = $this->getReturnsByOrderIds($orderIds);
+
+            $orders = array_map(function ($aorder) use ($order, $returnsMap) {
                 $aorder['custom_field'] = $this->decode($aorder['custom_field']);
                 $aorder['payment_custom_field'] = $this->decode($aorder['payment_custom_field']);
                 $aorder['customer_custom_field'] = $this->decode($aorder['customer_custom_field']);
-                $aorder['products'] = array_map(function ($product) use ($order) {
+                $aorder['products'] = array_map(function ($product) use ($order, $returnsMap) {
                     $aproduct = $product;
                     $aproduct['options'] = $order->getOrderOptions($product['order_id'], $product['order_product_id']);
+                    $aproduct['returns'] = $returnsMap[$product['order_id']][$product['product_id']] ?? [];
                     return $aproduct;
                 }, $order->getOrderProducts($aorder['order_id']));
                 $aorder['totals'] = $this->getOrderTotals($aorder['order_id'], $aorder['shipping_code'], $aorder['payment_country_id']);
@@ -312,6 +316,37 @@ class Controllercustomapi extends Controller
         $query = $this->db->query("SELECT * FROM {$prefix}coupon_history ch JOIN {$prefix}coupon c ON ch.coupon_id = c.coupon_id WHERE ch.order_id = {$order_id}");
 
         return $query->rows;
+    }
+
+    private function getReturnsByOrderIds(array $orderIds)
+    {
+        if (empty($orderIds)) {
+            return [];
+        }
+
+        $prefix = DB_PREFIX;
+        $language_id = (int)$this->config->get('config_language_id');
+        $ids = implode(',', array_map('intval', $orderIds));
+
+        $query = $this->db->query("
+            SELECT r.return_id, r.order_id, r.product_id, r.product, r.model, r.quantity, r.opened, r.comment,
+                   r.date_ordered, r.date_added, r.date_modified,
+                   rr.name AS reason,
+                   ra.name AS action,
+                   rs.name AS status
+            FROM {$prefix}return r
+            LEFT JOIN {$prefix}return_reason rr ON (r.return_reason_id = rr.return_reason_id AND rr.language_id = '{$language_id}')
+            LEFT JOIN {$prefix}return_action ra ON (r.return_action_id = ra.return_action_id AND ra.language_id = '{$language_id}')
+            LEFT JOIN {$prefix}return_status rs ON (r.return_status_id = rs.return_status_id AND rs.language_id = '{$language_id}')
+            WHERE r.order_id IN ({$ids}) AND rs.name = 'Complete'
+        ");
+
+        $map = [];
+        foreach ($query->rows as $row) {
+            $map[$row['order_id']][$row['product_id']][] = $row;
+        }
+
+        return $map;
     }
 
     /**
