@@ -325,20 +325,14 @@ class Controllercustomapi extends Controller
         }
 
         $prefix = DB_PREFIX;
-        $language_id = (int)$this->config->get('config_language_id');
         $ids = implode(',', array_map('intval', $orderIds));
 
         $query = $this->db->query("
-            SELECT r.return_id, r.order_id, r.product_id, r.product, r.model, r.quantity, r.opened, r.comment,
-                   r.date_ordered, r.date_added, r.date_modified,
-                   rr.name AS reason,
-                   ra.name AS action,
-                   rs.name AS status
-            FROM {$prefix}return r
-            LEFT JOIN {$prefix}return_reason rr ON (r.return_reason_id = rr.return_reason_id AND rr.language_id = '{$language_id}')
-            LEFT JOIN {$prefix}return_action ra ON (r.return_action_id = ra.return_action_id AND ra.language_id = '{$language_id}')
-            LEFT JOIN {$prefix}return_status rs ON (r.return_status_id = rs.return_status_id AND rs.language_id = '{$language_id}')
-            WHERE r.order_id IN ({$ids}) AND rs.name = 'Complete'
+            SELECT return_id, order_id, product_id, product, model, quantity, opened, comment,
+                   return_reason_id, return_action_id, return_status_id,
+                   date_ordered, date_added, date_modified
+            FROM {$prefix}return
+            WHERE order_id IN ({$ids})
         ");
 
         $map = [];
@@ -637,6 +631,21 @@ class Controllercustomapi extends Controller
             $sql = "select wd.unit, wd.title, w.weight_class_id from " . DB_PREFIX . "weight_class w
                 left join " . DB_PREFIX . "weight_class_description wd on w.weight_class_id = wd.weight_class_id
             Where wd.language_id = " . (int)$this->config->get('config_language_id');
+
+            $query = $this->db->query($sql);
+            $this->setResponseData($query->rows);
+        }
+    }
+
+    /**
+     * Return Status List
+     */
+    public function productReturnStatus()
+    {
+        if ($this->auth()) {
+            $sql = "SELECT return_status_id, name FROM " . DB_PREFIX . "return_status
+                    WHERE language_id = " . (int)$this->config->get('config_language_id') . "
+                    ORDER BY name ASC";
 
             $query = $this->db->query($sql);
             $this->setResponseData($query->rows);
