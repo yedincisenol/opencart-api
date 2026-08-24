@@ -11,6 +11,11 @@ class Controllercustomapi extends Controller
 {
     const limit = 15;
 
+    // Version of this controller, reported on every response so Yengec can tell a store that still
+    // runs an older copy of the file that it has to publish the current one. Bump it on every
+    // release that adds or changes an action.
+    const API_VERSION = 1;
+
     private $dbColumnName = 'username';
 
     private $data = [
@@ -397,23 +402,7 @@ class Controllercustomapi extends Controller
             foreach ($productRows as $row) {
                 $images = $this->db->query("SELECT * FROM {$this->dbPrefix}product_image WHERE product_id = {$row['product_id']}");
                 $row['images'] = $images->rows;
-                $options = $this->db->query(
-                    "SELECT opv.option_id,
-                       opv.option_value_id,
-                       opv.product_option_value_id,
-                       opv.price_prefix,
-                       opv.price,
-                       opv.quantity,
-                       opv.subtract,
-                       ovd.name as option_value_label,
-                       od.name  as option_label
-                    FROM {$this->dbPrefix}product_option_value as opv
-                             inner join {$this->dbPrefix}option_value_description ovd on opv.option_value_id = ovd.option_value_id
-                             inner join {$this->dbPrefix}option_description od on opv.option_id = od.option_id
-                    WHERE opv.product_id = {$row['product_id']}
-                      and ovd.language_id = {$languageId} LIMIT 50"
-                );
-                $row['options'] = $options->rows;
+                $row['options'] = $this->getProductOptions($row['product_id'], $languageId);
                 $row['tax_rate'] = $this->getTaxRate($taxes, $row['tax_class_id']);
                 $products[] = $row;
             }
@@ -565,6 +554,7 @@ class Controllercustomapi extends Controller
         }
 
         $this->response->addHeader('X-Opencart-Version: ' . VERSION);
+        $this->response->addHeader('X-Yengec-Api-Version: ' . self::API_VERSION);
         $this->response->addHeader('Content-Type: application/json');
         if(!$this->response->getOutput()) {
             $this->response->setOutput(json_encode($this->data));
@@ -926,25 +916,307 @@ class Controllercustomapi extends Controller
         $taxes = (new ModelLocalisationTaxClass($this->registry))->getTaxClasses();
         $data['tax_rate'] = $this->getTaxRate($taxes, $data['tax_class_id']);
         $data['images'] = $images->rows;
-        $options = $this->db->query(
-            "SELECT opv.option_id,
-                       opv.option_value_id,
-                       opv.product_option_value_id,
-                       opv.price_prefix,
-                       opv.price,
-                       opv.quantity,
-                       opv.subtract,
-                       ovd.name as option_value_label,
-                       od.name  as option_label
-                    FROM {$this->dbPrefix}product_option_value as opv
-                             inner join {$this->dbPrefix}option_value_description ovd on opv.option_value_id = ovd.option_value_id
-                             inner join {$this->dbPrefix}option_description od on opv.option_id = od.option_id
-                    WHERE opv.product_id = {$productId}
-                      and ovd.language_id = {$languageId} LIMIT 50"
-        );
-        $data['options'] = $options->rows;
+        $data['options'] = $this->getProductOptions($productId, $languageId);
 
         return $data;
+    }
+
+    /**
+     * All option rows of a product, one row per product_option_value.
+     *
+     * @param int $productId
+     * @param int $languageId
+     *
+     * @return array
+     */
+    private function getProductOptions($productId, $languageId)
+    {
+        $productId = (int)$productId;
+        $languageId = (int)$languageId;
+        $prefix = $this->dbPrefix;
+
+        $query = $this->db->query(
+            "SELECT opv.product_option_value_id,
+                    opv.product_option_id,
+                    opv.option_id,
+                    opv.option_value_id,
+                    opv.price_prefix,
+                    opv.price,
+                    opv.quantity,
+                    opv.subtract,
+                    opv.weight,
+                    opv.weight_prefix,
+                    po.required,
+                    o.type    as option_type,
+                    ovd.name  as option_value_label,
+                    od.name   as option_label
+             FROM {$prefix}product_option_value as opv
+                 INNER JOIN {$prefix}product_option po
+                     ON (po.product_option_id = opv.product_option_id)
+                 INNER JOIN {$prefix}option o
+                     ON (o.option_id = opv.option_id)
+                 INNER JOIN {$prefix}option_value_description ovd
+                     ON (ovd.option_value_id = opv.option_value_id AND ovd.language_id = {$languageId})
+                 INNER JOIN {$prefix}option_description od
+                     ON (od.option_id = opv.option_id AND od.language_id = {$languageId})
+             WHERE opv.product_id = {$productId}
+             ORDER BY opv.product_option_value_id"
+        );
+
+        return $query->rows;
+    }
+
+    /**
+     * Option catalog of the store: every option group with its values.
+     */
+    public function productOptions()
+    {
+        if (!$this->auth()) {
+            return false;
+        }
+
+        $languageId = (int)$this->config->get('config_language_id');
+        $prefix = $this->dbPrefix;
+
+        $query = $this->db->query(
+            "SELECT o.option_id, o.type, od.name
+             FROM {$prefix}option o
+                 INNER JOIN {$prefix}option_description od
+                     ON (od.option_id = o.option_id AND od.language_id = {$languageId})
+             ORDER BY o.sort_order, od.name"
+        );
+
+        $options = [];
+        foreach ($query->rows as $row) {
+            $optionId = (int)$row['option_id'];
+            $values = $this->db->query(
+                "SELECT ov.option_value_id, ovd.name
+                 FROM {$prefix}option_value ov
+                     INNER JOIN {$prefix}option_value_description ovd
+                         ON (ovd.option_value_id = ov.option_value_id AND ovd.language_id = {$languageId})
+                 WHERE ov.option_id = {$optionId}
+                 ORDER BY ov.sort_order, ovd.name"
+            );
+            $row['values'] = $values->rows;
+            $options[] = $row;
+        }
+
+        $this->setResponseData($options);
+    }
+
+    /**
+     * Create an option group, or return the existing one with the same name.
+     */
+    public function createOption()
+    {
+        if (!$this->auth()) {
+            return false;
+        }
+
+        $name = trim($this->request->post['name'] ?? '');
+        if ($name === '') {
+            return $this->error('name is required');
+        }
+
+        $type = $this->request->post['type'] ?? 'select';
+        if (!in_array($type, ['select', 'radio', 'checkbox'])) {
+            $type = 'select';
+        }
+
+        $prefix = $this->dbPrefix;
+        $escapedName = $this->db->escape($name);
+
+        $existing = $this->db->query(
+            "SELECT od.option_id FROM {$prefix}option_description od
+             WHERE od.name = '{$escapedName}' LIMIT 1"
+        );
+        if ($existing->num_rows) {
+            $this->setResponseData(['option_id' => (int)$existing->row['option_id']]);
+
+            return true;
+        }
+
+        $this->db->query(
+            "INSERT INTO {$prefix}option SET type = '" . $this->db->escape($type) . "', sort_order = '0'"
+        );
+        $optionId = (int)$this->db->getLastId();
+
+        foreach ($this->getLanguageIds() as $languageId) {
+            $this->db->query(
+                "INSERT INTO {$prefix}option_description SET option_id = '{$optionId}',
+                 language_id = '{$languageId}', name = '{$escapedName}'"
+            );
+        }
+
+        $this->setResponseData(['option_id' => $optionId]);
+    }
+
+    /**
+     * Create a value inside an option group, or return the existing one with the same name.
+     */
+    public function createOptionValue()
+    {
+        if (!$this->auth()) {
+            return false;
+        }
+
+        $optionId = (int)($this->request->post['option_id'] ?? 0);
+        $name = trim($this->request->post['name'] ?? '');
+        if (!$optionId || $name === '') {
+            return $this->error('option_id and name are required');
+        }
+
+        $prefix = $this->dbPrefix;
+        $escapedName = $this->db->escape($name);
+
+        $existing = $this->db->query(
+            "SELECT option_value_id FROM {$prefix}option_value_description
+             WHERE option_id = '{$optionId}' AND name = '{$escapedName}' LIMIT 1"
+        );
+        if ($existing->num_rows) {
+            $this->setResponseData(['option_value_id' => (int)$existing->row['option_value_id']]);
+
+            return true;
+        }
+
+        $this->db->query(
+            "INSERT INTO {$prefix}option_value SET option_id = '{$optionId}', image = '', sort_order = '0'"
+        );
+        $optionValueId = (int)$this->db->getLastId();
+
+        foreach ($this->getLanguageIds() as $languageId) {
+            $this->db->query(
+                "INSERT INTO {$prefix}option_value_description SET option_value_id = '{$optionValueId}',
+                 language_id = '{$languageId}', option_id = '{$optionId}', name = '{$escapedName}'"
+            );
+        }
+
+        $this->setResponseData(['option_value_id' => $optionValueId]);
+    }
+
+    /**
+     * Attach an option value to a product with its own stock and price difference.
+     * Creates the product_option row when the product does not use the option group yet,
+     * and updates the row instead of duplicating it when the value is already attached.
+     */
+    public function addProductOptionValue()
+    {
+        if (!$this->auth()) {
+            return false;
+        }
+
+        $data = $this->request->post;
+        $productId = (int)($data['product_id'] ?? 0);
+        $optionId = (int)($data['option_id'] ?? 0);
+        $optionValueId = (int)($data['option_value_id'] ?? 0);
+
+        if (!$productId || !$optionId || !$optionValueId) {
+            return $this->error('product_id, option_id and option_value_id are required');
+        }
+
+        $quantity = (int)($data['quantity'] ?? 0);
+        $price = (float)($data['price'] ?? 0);
+        $pricePrefix = (isset($data['price_prefix']) && $data['price_prefix'] === '-') ? '-' : '+';
+        $subtract = (isset($data['subtract']) && !$data['subtract']) ? '0' : '1';
+        $weight = (float)($data['weight'] ?? 0);
+        $weightPrefix = (isset($data['weight_prefix']) && $data['weight_prefix'] === '-') ? '-' : '+';
+
+        $productOptionId = $this->findOrCreateProductOption($productId, $optionId);
+        $prefix = $this->dbPrefix;
+
+        $existing = $this->db->query(
+            "SELECT product_option_value_id FROM {$prefix}product_option_value
+             WHERE product_id = '{$productId}' AND product_option_id = '{$productOptionId}'
+               AND option_value_id = '{$optionValueId}' LIMIT 1"
+        );
+
+        if ($existing->num_rows) {
+            $productOptionValueId = (int)$existing->row['product_option_value_id'];
+            $this->db->query(
+                "UPDATE {$prefix}product_option_value SET quantity = '{$quantity}', subtract = '{$subtract}',
+                 price = '{$price}', price_prefix = '{$pricePrefix}', weight = '{$weight}',
+                 weight_prefix = '{$weightPrefix}' WHERE product_option_value_id = '{$productOptionValueId}'"
+            );
+        } else {
+            $this->db->query(
+                "INSERT INTO {$prefix}product_option_value SET product_option_id = '{$productOptionId}',
+                 product_id = '{$productId}', option_id = '{$optionId}', option_value_id = '{$optionValueId}',
+                 quantity = '{$quantity}', subtract = '{$subtract}', price = '{$price}',
+                 price_prefix = '{$pricePrefix}', points = '0', points_prefix = '+',
+                 weight = '{$weight}', weight_prefix = '{$weightPrefix}'"
+            );
+            $productOptionValueId = (int)$this->db->getLastId();
+        }
+
+        $this->updateProductQuantityFromOptions($productId);
+
+        $this->setResponseData([
+            'product_option_id' => $productOptionId,
+            'product_option_value_id' => $productOptionValueId,
+        ]);
+    }
+
+    /**
+     * Product option row id for the given option group, created when missing.
+     *
+     * @param int $productId
+     * @param int $optionId
+     *
+     * @return int
+     */
+    private function findOrCreateProductOption($productId, $optionId)
+    {
+        $prefix = $this->dbPrefix;
+
+        $query = $this->db->query(
+            "SELECT product_option_id FROM {$prefix}product_option
+             WHERE product_id = '{$productId}' AND option_id = '{$optionId}' LIMIT 1"
+        );
+        if ($query->num_rows) {
+            return (int)$query->row['product_option_id'];
+        }
+
+        $this->db->query(
+            "INSERT INTO {$prefix}product_option SET product_id = '{$productId}',
+             option_id = '{$optionId}', value = '', required = '1'"
+        );
+
+        return (int)$this->db->getLastId();
+    }
+
+    /**
+     * Keep the product level stock in sync with the total stock of its options,
+     * otherwise the storefront hides a product whose own quantity is zero.
+     *
+     * @param int $productId
+     */
+    private function updateProductQuantityFromOptions($productId)
+    {
+        $prefix = $this->dbPrefix;
+
+        $this->db->query(
+            "UPDATE {$prefix}product SET quantity = (
+                SELECT COALESCE(SUM(quantity), 0) FROM {$prefix}product_option_value
+                WHERE product_id = '{$productId}' AND subtract = '1'
+             ) WHERE product_id = '{$productId}'"
+        );
+    }
+
+    /**
+     * Every installed language id, descriptions have to be written for all of them.
+     *
+     * @return array
+     */
+    private function getLanguageIds()
+    {
+        $query = $this->db->query("SELECT language_id FROM {$this->dbPrefix}language");
+
+        $languageIds = [];
+        foreach ($query->rows as $row) {
+            $languageIds[] = (int)$row['language_id'];
+        }
+
+        return $languageIds;
     }
 
     public function updateProductOptionPrice()
@@ -970,11 +1242,22 @@ class Controllercustomapi extends Controller
         $data = $this->request->post;
 
         $this->db->query(
-            "UPDATE  {$this->dbPrefix}product_option_value SET 
+            "UPDATE  {$this->dbPrefix}product_option_value SET
                  quantity = '{$data['quantity']}',
                  subtract = '1'
                  WHERE product_option_value_id = '{$_GET['product_option_value_id']}';"
         );
+
+        // The product row keeps its own quantity, so it has to follow the option totals.
+        $productOptionValueId = (int)$_GET['product_option_value_id'];
+        $productQuery = $this->db->query(
+            "SELECT product_id FROM {$this->dbPrefix}product_option_value
+             WHERE product_option_value_id = '{$productOptionValueId}'"
+        );
+
+        if ($productQuery->num_rows) {
+            $this->updateProductQuantityFromOptions((int)$productQuery->row['product_id']);
+        }
     }
 
     public function currencies()
