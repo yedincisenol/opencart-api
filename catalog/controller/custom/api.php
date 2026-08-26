@@ -234,11 +234,45 @@ class Api extends Controller
     }
 
     /**
+     * Detect the admin directory, since it may have been renamed.
+     * controller/common/dashboard.php only exists in the admin application.
+     */
+    private function getAdminDir(): ?string
+    {
+        static $dir = null;
+
+        if ($dir === null) {
+            $dir = '';
+
+            if (is_dir(DIR_OPENCART . 'admin/model/')) {
+                return $dir = DIR_OPENCART . 'admin/';
+            }
+
+            foreach (glob(DIR_OPENCART . '*/controller/common/dashboard.php') as $match) {
+                $candidate = dirname($match, 3) . '/';
+
+                if (is_dir($candidate . 'model/')) {
+                    $dir = $candidate;
+                    break;
+                }
+            }
+        }
+
+        return $dir ?: null;
+    }
+
+    /**
      * Helper to load admin models from catalog side
      */
     private function loadAdminModel(string $route): ?object
     {
-        $file = DIR_OPENCART . 'admin/model/' . $route . '.php';
+        $adminDir = $this->getAdminDir();
+
+        if (!$adminDir) {
+            return null;
+        }
+
+        $file = $adminDir . 'model/' . $route . '.php';
         if (file_exists($file)) {
             include_once($file);
 
